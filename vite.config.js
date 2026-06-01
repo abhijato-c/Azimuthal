@@ -3,5 +3,6 @@ import cesium from 'vite-plugin-cesium';
 
 export default defineConfig({
     base : '/',
-    plugins : [cesium()]
+    plugins : [cesium()],
+    worker: {format: 'es'}
 });
