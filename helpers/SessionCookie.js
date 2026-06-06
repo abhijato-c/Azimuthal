@@ -1,6 +1,6 @@
-import { put, get } from '@vercel/blob';
+import { put } from '@vercel/blob';
 
-let BLOB_URL = "https://oak9imuykyhibxko.private.blob.vercel-storage.com/session/SpacetrackCookie.json";
+let BLOB_URL = "https://oak9imuykyhibxko.private.blob.vercel-storage.com/SpacetrackCookie.json";
 const TestUrl = "https://www.space-track.org/basicspacedata/query/class/gp/NORAD_CAT_ID/25544/limit/1/format/json";
 const LoginUrl = "https://www.space-track.org/ajaxauth/login";
 
@@ -66,7 +66,7 @@ export async function GetCookie(){
     const JsonVal = { Cookie: CleanCookie, Expiry: ExpiryDate };
 
     // Store cookie
-    const blob = await put('session/SpacetrackCookie.json', JSON.stringify(JsonVal), {
+    const blob = await put('SpacetrackCookie.json', JSON.stringify(JsonVal), {
         access: 'private',
         contentType: 'application/json',
         addRandomSuffix: false,
