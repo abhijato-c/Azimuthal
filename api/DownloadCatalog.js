@@ -3,7 +3,7 @@ import { GetCookie } from '../helpers/SessionCookie.js';
 
 export const config = {
     runtime: 'nodejs',
-    maxDuration: 600
+    maxDuration: 300
 };
 
 const ChunkUrl = 'https://www.space-track.org/basicspacedata/query/class/gp/DECAY_DATE/null-val/OBJECT_TYPE/PAYLOAD/format/json';

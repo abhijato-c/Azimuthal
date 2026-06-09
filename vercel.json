@@ -2,7 +2,7 @@
     "crons": [
         {
             "path": "/api/DownloadCatalog",
-            "schedule": "0 0 * * *"
+            "schedule": "23 3 * * *"
         }
     ]
 }
