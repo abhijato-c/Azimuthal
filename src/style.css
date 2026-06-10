@@ -1,4 +1,4 @@
-html, body, #cesiumContainer {
+html, body {
     width: 100%;
     height: 100%;
     margin: 0;
@@ -41,4 +41,73 @@ html, body, #cesiumContainer {
 
 @keyframes spin {
     to {transform: rotate(360deg);}
+}
+
+#AppContainer {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#cesiumContainer {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.Sidebar {
+    width: 0;
+    height: 100%;
+    background-color: rgb(30, 30, 30);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    box-sizing: border-box;
+    z-index: 100;
+}
+
+#LeftSidebar {
+    border-right: 1px solid rgb(10, 10, 10);
+}
+
+#RightSidebar {
+    border-left: 1px solid rgb(10, 10, 10);
+}
+
+.Sidebar.open {
+    width: 20vw !important;
+}
+
+.ToggleBtn {
+    position: fixed;
+    top: 1vw;
+    height: 2vw;
+    width: 2vw;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 2px solid rgb(200, 200, 200);
+    border-radius: 10%;
+    cursor: pointer;
+    z-index: 101;
+    color: rgb(180, 180, 180);
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.ToggleBtn img{
+    object-fit: contain;
+    width: 80%;
+    height: 90%;
+}
+
+#ToggleLeftSidebar {
+    left: 1vw;
+}
+
+#ToggleRightSidebar {
+    right: 1vw;
 }

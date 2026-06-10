@@ -15,8 +15,27 @@
 				<p>This may take a few seconds...</p>
 			</div>
 		</div>
+		
+		<div id="AppContainer">
+			<button id="ToggleLeftSidebar" class="ToggleBtn" onclick="ToggleSidebar('LeftSidebar')">
+				<img src="/src/assets/Menu.png">
+			</button>
 
-    	<div id="cesiumContainer"></div>
-    	<script type="module" src="/src/main.js"></script>
+			<div class="Sidebar" id="LeftSidebar">
+				
+			</div>
+
+			<div id="cesiumContainer"></div>
+
+			<button id="ToggleRightSidebar" class="ToggleBtn" onclick="ToggleSidebar('RightSidebar')">
+				<img src="/src/assets/Info.png">
+			</button>
+
+			<div class="Sidebar" id="RightSidebar">
+				
+			</div>
+		</div>
+
+	<script type="module" src="/src/main.js"></script>
   	</body>
 </html>

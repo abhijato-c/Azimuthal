@@ -7,10 +7,14 @@ const viewer = new Viewer('cesiumContainer', {
 	fullScreenButton: false,
 	vrButton: false,
 	infoBox: false,
+	homeButton: false,
+	navigationHelpButton: false,
+	geocoder: false,
+	fullscreenButton: false,
 	shouldAnimate: true,
 	projectionPicker: false,
 	sceneModePicker: false,
-	scene3DOnly: true
+	scene3DOnly: true,
 })
 
 const SatEntries = new Map();
@@ -68,6 +72,13 @@ function TrackingLoop(){
 			}
 		}
 	});
+}
+
+window.ToggleSidebar = function(ID){
+	console.log('clicked');
+	const Sidebar = document.getElementById(ID);
+	Sidebar.classList.toggle("open");
+	setTimeout(() => viewer.resize(), 400);
 }
 
 Init();
