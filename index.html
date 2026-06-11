@@ -22,7 +22,24 @@
 			</button>
 
 			<div class="Sidebar" id="LeftSidebar">
-				
+				<input type="text" id="NameSearch" placeholder="Satellite Name">
+				<hr>
+				<p class="FilterHeader">Launch Date Between:</p>
+				<div id="DateContainer">
+					<input type="date" id="LaunchDateFrom" class="FilterLaunchDate">
+					<input type="date" id="LaunchDateTo" class="FilterLaunchDate">
+				</div>
+				<hr>
+				<div class="FilterRow">
+					<div class="FilterGroup">
+						<p class="FilterHeader">Country:</p>
+						<select id="CountrySelector" class="FilterDropdown"></select>
+					</div>
+					<div class="FilterGroup">
+						<p class="FilterHeader">Launch Site:</p>
+						<select id="SiteSelector" class="FilterDropdown"></select>
+					</div>
+				</div>
 			</div>
 
 			<div id="cesiumContainer"></div>

@@ -81,4 +81,5 @@ window.ToggleSidebar = function(ID){
 	setTimeout(() => viewer.resize(), 400);
 }
 
+//document.getElementById('LoadingOverlay').remove()
 Init();

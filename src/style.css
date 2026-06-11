@@ -57,30 +57,6 @@ html, body {
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.Sidebar {
-    width: 0;
-    height: 100%;
-    background-color: rgb(30, 30, 30);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    box-sizing: border-box;
-    z-index: 100;
-}
-
-#LeftSidebar {
-    border-right: 1px solid rgb(10, 10, 10);
-}
-
-#RightSidebar {
-    border-left: 1px solid rgb(10, 10, 10);
-}
-
-.Sidebar.open {
-    width: 20vw !important;
-}
-
 .ToggleBtn {
     position: fixed;
     top: 1vw;
@@ -110,4 +86,110 @@ html, body {
 
 #ToggleRightSidebar {
     right: 1vw;
+}
+
+.Sidebar {
+    width: 0;
+    height: 100%;
+    background-color: rgb(30, 30, 30);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    box-sizing: border-box;
+    z-index: 100;
+}
+
+#LeftSidebar {
+    border-right: 1px solid rgb(10, 10, 10);
+}
+
+#RightSidebar {
+    border-left: 1px solid rgb(10, 10, 10);
+}
+
+.Sidebar.open {
+    width: 20vw !important;
+}
+
+#NameSearch {
+    position: relative;
+    width: 65%;
+    height: 2vw;
+    top: 1vw;
+    left: 4vw;
+    border-radius: 2vw;
+    background-color: rgb(70, 70, 70);
+    border: 2px solid rgb(20, 20, 20);
+    color: rgb(220, 220, 220);
+    padding: 0 5%;
+    margin-bottom: 5%;
+}
+
+#NameSearch::placeholder {
+    font-weight: bold;
+}
+
+.Sidebar hr {
+    position: relative;
+    width: 90%;
+    height: 0.3%;
+    border: 0;
+    margin: 5% 0 2% 0;
+    padding: 0;
+    background-color: rgb(200, 200, 200);
+    align-self: center;
+}
+
+.FilterHeader {
+    position: relative;
+    left: 5%;
+    color: rgb(240, 240, 240);
+    font-weight: 600;
+    margin: 0 0 2% 0;
+}
+
+#DateContainer {
+    display: flex;
+    width: 100%;
+    justify-content: space-evenly;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}
+
+.FilterLaunchDate{
+    position: relative;
+    width: 40%;
+}
+
+.FilterRow {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 5%;
+    gap: 5%;
+}
+
+.FilterGroup {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.FilterGroup .FilterHeader {
+    position: static;
+}
+
+.FilterDropdown {
+    position: relative;
+    width: 100%;
+    background-color: rgb(100, 100, 100);
+    border: 2px solid rgb(50, 50, 50);
+    border-radius: 0.9cqh;
+    color: rgb(220, 220, 220);
+    padding: 0 5px;
+    font-family: sans-serif;
+    outline: none;
+    cursor: pointer;
 }
