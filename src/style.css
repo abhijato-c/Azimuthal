@@ -17,7 +17,6 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 #LoadingCard {
@@ -145,7 +144,7 @@ html, body {
     position: relative;
     left: 5%;
     color: rgb(240, 240, 240);
-    font-weight: 600;
+    font-weight: bold;
     margin: 0 0 2% 0;
 }
 
@@ -181,15 +180,79 @@ html, body {
     position: static;
 }
 
-.FilterDropdown {
+.MultiselectContainer {
     position: relative;
     width: 100%;
-    background-color: rgb(100, 100, 100);
-    border: 2px solid rgb(50, 50, 50);
-    border-radius: 0.9cqh;
+}
+
+.MultiselectTrigger {
+    width: 100%;
+    height: 32px;
+    background-color: rgb(70, 70, 70);
+    border: 2px solid rgb(20, 20, 20);
+    border-radius: 4px;
     color: rgb(220, 220, 220);
-    padding: 0 5px;
+    padding: 0 10px;
     font-family: sans-serif;
-    outline: none;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    box-sizing: border-box;
+    user-select: none;
+}
+.MultiselectTrigger:hover { border-color: rgb(100, 100, 100); }
+
+.MultiselectOptions {
+    display: none;
+    position: absolute;
+    top: 36px;
+    left: 0;
+    width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    background-color: rgb(45, 45, 45);
+    border: 2px solid rgb(20, 20, 20);
+    border-radius: 4px;
+    z-index: 1000;
+    box-sizing: border-box;
+    padding: 4px 0;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+.MultiselectOptions.open { display: block; }
+
+.MultiselectItem {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    color: rgb(220, 220, 220);
+    font-family: sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+.MultiselectItem:hover { background-color: rgb(70, 70, 70); }
+
+.MultiselectItem input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+    accent-color: #00a8ff;
+}
+
+#SearchSubmit {
+    position: relative;
+    width: 80%;
+    height: 4%;
+    align-self: center;
+    font-weight: 800;
+    background-color: hsl(210, 90%, 35%);
+    border: 2px solid rgb(220, 220, 220);
+    border-radius: 50cqh;
+    color: rgb(200, 200, 200);
+    font-size: 2cqh;
     cursor: pointer;
 }
+
+#SearchSubmit:hover { background-color: hsl(210, 90%, 50%); }
+#SearchSubmit:active { background-color: hsl(210, 90%, 30%); }

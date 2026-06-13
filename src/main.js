@@ -19,9 +19,31 @@ const viewer = new Viewer('cesiumContainer', {
 
 const SatEntries = new Map();
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
+let Countries = {}
+let Sites = {}
 let PastUpdate = JulianDate.now();
 
 async function Init(){
+	const Request = await fetch('api/FetchCountries');
+	const Response = await Request.json();
+	Countries = Response.Countries;
+	Sites = Response.Sites;
+
+	const SortedCountries = Object.entries(Countries).sort((a, b) => a[0].localeCompare(b[0]));
+	Countries = Object.fromEntries(SortedCountries);
+	
+	const Options = document.getElementById('CountryOptions');
+	Object.entries(Countries).forEach(([name, code]) => {
+		const label = document.createElement('label');
+		label.className = 'MultiselectItem';
+		label.innerHTML = `
+            <input type="checkbox" value="${code}" checked onchange="UpdateCountrySelection()">
+            <span>${name}</span>
+        `;
+		Options.append(label);
+	});
+	window.UpdateCountrySelection();
+
 	console.log('Fetching initial data');
 	const req = await fetch('/api/FetchInitial');
 	const results = await req.json();
@@ -42,10 +64,7 @@ async function Init(){
 	TrackingLoop();
 
 	// Dismiss loading screen
-	const Loader = document.getElementById('LoadingOverlay');
-	Loader.style.opacity = '0';
-	Loader.style.visibility = 'hidden';
-	setTimeout(() => Loader.remove(), 300);
+	setTimeout(() => document.getElementById('LoadingOverlay').remove(), 300);
 }
 
 function TrackingLoop(){
@@ -74,12 +93,49 @@ function TrackingLoop(){
 	});
 }
 
+window.Sort = function (){
+
+}
+
 window.ToggleSidebar = function(ID){
-	console.log('clicked');
 	const Sidebar = document.getElementById(ID);
 	Sidebar.classList.toggle("open");
 	setTimeout(() => viewer.resize(), 400);
 }
 
-//document.getElementById('LoadingOverlay').remove()
+window.ToggleMultiselect = function(ID){
+	document.getElementById(ID).classList.toggle('open');
+}
+
+window.UpdateCountrySelection = function(){
+	const Selected = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
+	let LaunchSites = new Set();
+	Selected.forEach((cb) => {
+		const CountryName = cb.value;
+		Sites[CountryName].forEach(Site => LaunchSites.add(Site));
+	})
+	
+	LaunchSites = Array.from(LaunchSites).sort();
+	const SiteOptions = document.getElementById('SiteOptions');
+	SiteOptions.innerHTML = '';
+	for (const Site of LaunchSites) {
+		const label = document.createElement('label');
+		label.className = 'MultiselectItem';
+		label.innerHTML = `
+            <input type="checkbox" value="${Site}" checked>
+            <span>${Site}</span>
+        `;
+		SiteOptions.append(label);
+	}
+}
+
+document.addEventListener('click', function(e) {
+    const Country = document.getElementById('CountrySelectContainer');
+	const Site = document.getElementById('SiteSelectContainer');
+    if (!Country.contains(e.target))
+        document.getElementById('CountryOptions').classList.remove('open');
+    if (!Site.contains(e.target))
+        document.getElementById('SiteOptions').classList.remove('open');
+});
+
 Init();

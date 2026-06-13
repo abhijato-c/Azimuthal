@@ -33,13 +33,27 @@
 				<div class="FilterRow">
 					<div class="FilterGroup">
 						<p class="FilterHeader">Country:</p>
-						<select id="CountrySelector" class="FilterDropdown"></select>
+						<div class="MultiselectContainer" id="CountrySelectContainer">
+							<div class="MultiselectTrigger" onclick="ToggleMultiselect('CountryOptions')">
+								<span id="MultiselectLabel">All Countries</span>
+								<span class="MultiselectArrow">▼</span>
+							</div>
+							<div class="MultiselectOptions" id="CountryOptions"></div>
+						</div>
 					</div>
 					<div class="FilterGroup">
 						<p class="FilterHeader">Launch Site:</p>
-						<select id="SiteSelector" class="FilterDropdown"></select>
+						<div class="MultiselectContainer" id="SiteSelectContainer">
+							<div class="MultiselectTrigger" onclick="ToggleMultiselect('SiteOptions')">
+								<span id="MultiselectLabel">All Sites</span>
+								<span class="MultiselectArrow">▼</span>
+							</div>
+							<div class="MultiselectOptions" id="SiteOptions"></div>
+						</div>
 					</div>
 				</div>
+				<hr>
+				<button id="SearchSubmit" onclick="Search()">Search</button>
 			</div>
 
 			<div id="cesiumContainer"></div>
