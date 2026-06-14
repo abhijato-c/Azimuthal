@@ -3,22 +3,22 @@ import { neon } from '@neondatabase/serverless';
 export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-        const filters = req.body.filters || {};
+        const filters = req.body["filters"];
 
         // Build query with filters
         let query = 'SELECT norad_id FROM satellites';
         if (Object.keys(filters).length > 0) {
             query += ' WHERE';
-            if (filters.country) {
-                const InList = filters.country.map(c => `'${c}'`).join(', ');
+            if (filters.Country) {
+                const InList = filters.Country.map(c => `'${c}'`).join(', ');
                 query += ` country IN (${InList}) AND`;
             }
-            if (filters.LaunchSite) {
-                const InList = filters.LaunchSite.map(s => `'${s}'`).join(', ');
+            if (filters.Site) {
+                const InList = filters.Site.map(s => `'${s}'`).join(', ');
                 query += ` launch_site IN (${InList}) AND`;
             }
-            if (filters.LaunchDate) {
-                query += ` launch_date BETWEEN '${filters.LaunchDate[0]}' AND '${filters.LaunchDate[1]}' AND`;
+            if (filters.Date) {
+                query += ` launch_date BETWEEN '${filters.Date[0]}' AND '${filters.Date[1]}' AND`;
             }
         }
 

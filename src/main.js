@@ -69,7 +69,7 @@ async function Init(){
 
 function TrackingLoop(){
 	viewer.scene.preUpdate.addEventListener((scene, time) => {
-		if (JulianDate.secondsDifference(time, PastUpdate) < 0.1) return;
+		if (Math.abs(JulianDate.secondsDifference(time, PastUpdate)) < 0.1) return;
 
 		PastUpdate = time;
 		const Date = JulianDate.toDate(time);
@@ -93,8 +93,34 @@ function TrackingLoop(){
 	});
 }
 
-window.Sort = function (){
+window.Search = async function (){
+	let Name = document.getElementById("NameSearch").value;
+	let FromDate = document.getElementById("LaunchDateFrom").valueAsDate;
+	let ToDate = document.getElementById("LaunchDateTo").valueAsDate;
+	let ElementCountries = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
+	let ElementSites = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked');
+	let SelectedCountries = [];
+	let SelectedSites = [];
 
+	if (!FromDate) FromDate = new Date(1900, 0, 0);
+	if (!ToDate) ToDate = new Date();
+	ElementCountries.forEach((cb) => { SelectedCountries.push(cb.value); });
+	ElementSites.forEach((cb) => { SelectedSites.push(cb.value); });
+
+	let filter = {Name: Name, Country: SelectedCountries, Site: SelectedSites, Date: [FromDate, ToDate]};
+	const resp = await fetch('/api/FetchCatalog', {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json'},
+		body: JSON.stringify({filters: filter})
+	});
+	if (!resp.ok) {
+		return;
+	}
+
+	var IDs = await resp.json();
+	IDs = new Set(IDs);
+	for (const [id, data] of SatEntries.entries())
+		data.Point.show = IDs.has(id);
 }
 
 window.ToggleSidebar = function(ID){
@@ -113,7 +139,7 @@ window.UpdateCountrySelection = function(){
 	Selected.forEach((cb) => {
 		const CountryName = cb.value;
 		Sites[CountryName].forEach(Site => LaunchSites.add(Site));
-	})
+	});
 	
 	LaunchSites = Array.from(LaunchSites).sort();
 	const SiteOptions = document.getElementById('SiteOptions');

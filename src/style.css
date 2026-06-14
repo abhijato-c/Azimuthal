@@ -243,3 +243,46 @@ html, body {
 }
 #SearchSubmit:hover { background-color: hsl(210, 90%, 50%); }
 #SearchSubmit:active { background-color: hsl(210, 90%, 30%); }
+
+#SearchScroll {
+    height: 100%;
+    width: 95%;
+    align-self: center;
+    background-color: rgb(50, 50, 50);
+}
+
+#SearchScrollPage {
+    display: flex;
+    flex-shrink: 0;
+    height: 45px;
+    width: 55%;
+    margin: 10px 0;
+    background-color: rgb(70, 70, 70);
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    gap: 5px;
+    border-radius: 7px;
+}
+
+.PageBtn {
+    height: 33px;
+    width: 33px;
+    border: none;
+    background-color: rgb(40, 40, 40);
+    color: rgb(200, 200, 200);
+    border-radius: 5px;
+}
+
+#PageNo {
+    display: inline-flex;
+    height: 23px;
+    width: 50%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background-color: rgb(120, 120, 120);
+    color: rgb(220, 220, 220);
+    font-size: 16px;
+    font-weight: 600;
+}
