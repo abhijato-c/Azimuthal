@@ -13,7 +13,7 @@ html, body {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.7);
-    z-index: 9999;
+    z-index: 200;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -38,9 +38,7 @@ html, body {
     animation: spin 1s infinite linear;
 }
 
-@keyframes spin {
-    to {transform: rotate(360deg);}
-}
+@keyframes spin { to {transform: rotate(360deg);} }
 
 #AppContainer {
     display: flex;
@@ -58,9 +56,9 @@ html, body {
 
 .ToggleBtn {
     position: fixed;
-    top: 1vw;
-    height: 2vw;
-    width: 2vw;
+    top: 15px;
+    height: 30px;
+    width: 30px;
     background-color: rgba(0, 0, 0, 0.2);
     border: 2px solid rgb(200, 200, 200);
     border-radius: 10%;
@@ -79,13 +77,8 @@ html, body {
     height: 90%;
 }
 
-#ToggleLeftSidebar {
-    left: 1vw;
-}
-
-#ToggleRightSidebar {
-    right: 1vw;
-}
+#ToggleLeftSidebar { left: 15px; }
+#ToggleRightSidebar { right: 15px; }
 
 .Sidebar {
     width: 0;
@@ -98,36 +91,22 @@ html, body {
     box-sizing: border-box;
     z-index: 100;
 }
-
-#LeftSidebar {
-    border-right: 1px solid rgb(10, 10, 10);
-}
-
-#RightSidebar {
-    border-left: 1px solid rgb(10, 10, 10);
-}
-
-.Sidebar.open {
-    width: 20vw !important;
-}
+.Sidebar.open { width: 320px !important; }
 
 #NameSearch {
     position: relative;
     width: 65%;
-    height: 2vw;
-    top: 1vw;
-    left: 4vw;
-    border-radius: 2vw;
+    height: 30px;
+    top: 15px;
+    left: 60px;
+    border-radius: 30px;
     background-color: rgb(70, 70, 70);
     border: 2px solid rgb(20, 20, 20);
     color: rgb(220, 220, 220);
     padding: 0 5%;
     margin-bottom: 5%;
 }
-
-#NameSearch::placeholder {
-    font-weight: bold;
-}
+#NameSearch::placeholder { font-weight: bold; }
 
 .Sidebar hr {
     position: relative;
@@ -143,9 +122,10 @@ html, body {
 .FilterHeader {
     position: relative;
     left: 5%;
+    margin: 0 0 2% 0;
     color: rgb(240, 240, 240);
     font-weight: bold;
-    margin: 0 0 2% 0;
+    font-size: 15px;
 }
 
 #DateContainer {
@@ -159,7 +139,14 @@ html, body {
 
 .FilterLaunchDate{
     position: relative;
+    height: 28px;
     width: 40%;
+    background-color: rgb(70, 70, 70);
+    border: 2px solid rgb(20, 20, 20);
+    border-radius: 4px;
+    color: rgb(220, 220, 220);
+    text-align: center;
+    font-size: 13px;
 }
 
 .FilterRow {
@@ -209,18 +196,19 @@ html, body {
     position: absolute;
     top: 36px;
     left: 0;
-    width: 100%;
-    max-height: 220px;
+    width: 130%;
+    max-height: 250px;
     overflow-y: auto;
     background-color: rgb(45, 45, 45);
     border: 2px solid rgb(20, 20, 20);
     border-radius: 4px;
-    z-index: 1000;
+    z-index: 101;
     box-sizing: border-box;
     padding: 4px 0;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
 }
 .MultiselectOptions.open { display: block; }
+#SiteOptions {width: 100%;}
 
 .MultiselectItem {
     display: flex;
@@ -242,17 +230,16 @@ html, body {
 
 #SearchSubmit {
     position: relative;
-    width: 80%;
-    height: 4%;
+    width: 240px;
+    height: 35px;
     align-self: center;
     font-weight: 800;
     background-color: hsl(210, 90%, 35%);
     border: 2px solid rgb(220, 220, 220);
-    border-radius: 50cqh;
+    border-radius: 35px;
     color: rgb(200, 200, 200);
-    font-size: 2cqh;
+    font-size: 20px;
     cursor: pointer;
 }
-
 #SearchSubmit:hover { background-color: hsl(210, 90%, 50%); }
 #SearchSubmit:active { background-color: hsl(210, 90%, 30%); }
