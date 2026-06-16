@@ -1,3 +1,30 @@
+:root {
+    --BackgroundOverlay: hsla(225, 25%, 5%, 0.85);
+    --BackgroundSidebar: hsl(224, 30%, 10%);
+    --BackgroundSunken: hsl(225, 20%, 5%);
+    --BackgroundRaised: hsl(225, 20%, 15%);
+    --BackgroundHover: hsl(225, 30%, 22%);
+
+    --AccentCyan: hsl(195, 100%, 45%);
+    --AccentCyanDim: hsla(195, 100%, 45%, 0.15);
+    --AccentCyanGlow: hsla(195, 100%, 45%, 0.4);
+    --AccentBlueGradient: linear-gradient(135deg, hsl(195, 100%, 45%), hsl(210, 100%, 40%));
+    --AccentHoverGradient: linear-gradient(135deg, hsl(195, 100%, 50%), hsl(210, 100%, 45%));
+
+    --TextBright: hsl(0, 0%, 100%);
+    --TextPrimary: hsl(210, 25%, 95%);
+    --TextSecondary: hsl(215, 16%, 72%);
+    --TextMuted: hsl(215, 12%, 50%);
+
+    --BorderDim: hsl(225, 12%, 16%);
+    --BorderBright: hsl(225, 12%, 40%);
+    --BorderGlow: hsla(195, 100%, 45%, 0.6);
+
+    --ShadowInsetDepth: inset 0 2px 4px hsla(0, 0%, 0%, 0.6);
+    --ShadowCardAmbient: 0 4px 14px hsla(0, 0%, 0%, 0.5);
+    --TextShadowHeading: 0 2px 4px hsla(0, 0%, 0%, 0.5);
+}
+
 html, body {
     width: 100%;
     height: 100%;
@@ -12,45 +39,48 @@ html, body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
     z-index: 200;
     display: flex;
     justify-content: center;
     align-items: center;
+    background-color: var(--BackgroundOverlay);
+    backdrop-filter: blur(4px);
 }
 
 #LoadingCard {
-    background-color: rgb(100, 100, 100);
-    color: rgb(240, 240, 240);
+    position: fixed;
+    height: 180px;
+    width: 300px;
     padding: 30px;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgb(0, 0, 0);
+    background-color: rgb(100, 100, 100);
+    color: var(--TextPrimary);
+    box-shadow: var(--ShadowCardAmbient), 0 0 20px hsla(195, 100%, 45%, 0.1);
+    border: 1px solid var(--BorderBright);
 }
 
 .Spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #00a8ff;
     border-radius: 50%;
     margin: 0 auto 15px auto;
     animation: spin 1s infinite linear;
+    border: 4px solid hsla(0, 0%, 100%, 0.08);
+    border-top-color: var(--AccentCyan);
 }
-
 @keyframes spin { to {transform: rotate(360deg);} }
 
 #AppContainer {
     display: flex;
+    position: relative;
     width: 100%;
     height: 100%;
-    position: relative;
 }
 
 #cesiumContainer {
-    flex: 1;
-    height: 100%;
     position: relative;
+    height: 100%;
+    flex: 1;
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
@@ -83,49 +113,63 @@ html, body {
 .Sidebar {
     width: 0;
     height: 100%;
-    background-color: rgb(30, 30, 30);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
     box-sizing: border-box;
     z-index: 100;
+    background-color: var(--BackgroundSidebar);
 }
 .Sidebar.open { width: 320px !important; }
-
-#NameSearch {
-    position: relative;
-    width: 65%;
-    height: 30px;
-    top: 15px;
-    left: 60px;
-    border-radius: 30px;
-    background-color: rgb(70, 70, 70);
-    border: 2px solid rgb(20, 20, 20);
-    color: rgb(220, 220, 220);
-    padding: 0 5%;
-    margin-bottom: 5%;
-}
-#NameSearch::placeholder { font-weight: bold; }
+#LeftSidebar { border-right: 1px solid var(--BorderDim); }
+#RightSidebar { border-left: 1px solid var(--BorderDim); }
 
 .Sidebar hr {
     position: relative;
     width: 90%;
-    height: 0.3%;
+    height: 4px;
     border: 0;
-    margin: 5% 0 2% 0;
+    margin: 7px 0 7px 0;
     padding: 0;
-    background-color: rgb(200, 200, 200);
     align-self: center;
+    background: linear-gradient(60deg, transparent, var(--BorderBright), transparent);
 }
 
 .FilterHeader {
     position: relative;
     left: 5%;
     margin: 0 0 2% 0;
-    color: rgb(240, 240, 240);
     font-weight: bold;
     font-size: 15px;
+    color: var(--TextPrimary);
+    text-shadow: var(--TextShadowHeading);
+}
+
+#NameSearch {
+    position: relative;
+    outline: none;
+    width: 65%;
+    height: 30px;
+    top: 15px;
+    left: 60px;
+    border-radius: 30px;
+    padding: 0 5%;
+    margin-bottom: 5%;
+    background-color: var(--BackgroundSunken);
+    border: 2px solid var(--BorderBright);
+    color: var(--TextPrimary);
+    box-shadow: var(--ShadowInsetDepth);
+}
+
+#NameSearch:focus {
+    border-color: var(--BorderGlow);
+    box-shadow: var(--ShadowInsetDepth), 0 0 8px var(--AccentCyanGlow);
+}
+
+#NameSearch::placeholder { 
+    font-weight: bold; 
+    color: var(--TextMuted);
 }
 
 #DateContainer {
@@ -137,22 +181,29 @@ html, body {
     padding: 0;
 }
 
-.FilterLaunchDate{
+.FilterLaunchDate {
     position: relative;
+    outline: none;
     height: 28px;
     width: 40%;
-    background-color: rgb(70, 70, 70);
-    border: 2px solid rgb(20, 20, 20);
     border-radius: 4px;
-    color: rgb(220, 220, 220);
     text-align: center;
     font-size: 13px;
+    background-color: var(--BackgroundSunken);
+    border: 2px solid var(--BorderBright);
+    color: var(--TextSecondary);
+    box-shadow: var(--ShadowInsetDepth);
+}
+
+.FilterLaunchDate:focus {
+    border-color: var(--BorderGlow);
+    box-shadow: var(--ShadowInsetDepth), 0 0 8px var(--AccentCyanGlow);
 }
 
 .FilterRow {
     display: flex;
-    width: 100%;
     box-sizing: border-box;
+    width: 100%;
     padding: 0 5%;
     gap: 5%;
 }
@@ -175,10 +226,7 @@ html, body {
 .MultiselectTrigger {
     width: 100%;
     height: 32px;
-    background-color: rgb(70, 70, 70);
-    border: 2px solid rgb(20, 20, 20);
     border-radius: 4px;
-    color: rgb(220, 220, 220);
     padding: 0 10px;
     font-family: sans-serif;
     font-size: 13px;
@@ -188,8 +236,16 @@ html, body {
     cursor: pointer;
     box-sizing: border-box;
     user-select: none;
+    background-color: var(--BackgroundSunken);
+    color: var(--TextSecondary);
+    border: 2px solid var(--BorderBright);
+    box-shadow: var(--ShadowInsetDepth);
 }
-.MultiselectTrigger:hover { border-color: rgb(100, 100, 100); }
+
+.MultiselectTrigger:hover {
+    border-color: var(--TextMuted);
+    color: var(--TextPrimary);
+}
 
 .MultiselectOptions {
     display: none;
@@ -199,33 +255,38 @@ html, body {
     width: 130%;
     max-height: 250px;
     overflow-y: auto;
-    background-color: rgb(45, 45, 45);
-    border: 2px solid rgb(20, 20, 20);
     border-radius: 4px;
     z-index: 101;
     box-sizing: border-box;
     padding: 4px 0;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+    background-color: var(--BackgroundRaised);
+    border: 2px solid var(--BorderBright);
+    box-shadow: 0 8px 24px hsla(0, 0%, 0%, 0.7);
 }
 .MultiselectOptions.open { display: block; }
+
 #SiteOptions {width: 100%;}
 
 .MultiselectItem {
     display: flex;
     align-items: center;
     padding: 6px 12px;
-    color: rgb(220, 220, 220);
     font-family: sans-serif;
     font-size: 13px;
     cursor: pointer;
     user-select: none;
+    color: var(--TextSecondary);
 }
-.MultiselectItem:hover { background-color: rgb(70, 70, 70); }
+
+.MultiselectItem:hover { 
+    background-color: var(--BackgroundHover);
+    color: var(--TextPrimary); 
+}
 
 .MultiselectItem input[type="checkbox"] {
     margin-right: 10px;
     cursor: pointer;
-    accent-color: #00a8ff;
+    accent-color: var(--AccentCyan);
 }
 
 #SearchSubmit {
@@ -233,23 +294,38 @@ html, body {
     width: 240px;
     height: 35px;
     align-self: center;
-    font-weight: 800;
-    background-color: hsl(210, 90%, 35%);
-    border: 2px solid rgb(220, 220, 220);
-    border-radius: 35px;
-    color: rgb(200, 200, 200);
-    font-size: 20px;
     cursor: pointer;
+    border-radius: 35px;
+    font-size: 20px;
+    font-weight: 700;
+    background: var(--AccentBlueGradient);
+    color: var(--TextBright);
+    border: 2px solid hsla(0, 0, 100%, 0.15);
+    box-shadow: 0 4px 12px var(--AccentCyanDim);
+    text-shadow: 0 1px 2px hsla(0, 0%, 0%, 0.4);
 }
-#SearchSubmit:hover { background-color: hsl(210, 90%, 50%); }
-#SearchSubmit:active { background-color: hsl(210, 90%, 30%); }
+
+#SearchSubmit:hover { 
+    background: var(--AccentHoverGradient);
+    box-shadow: 0 4px 16px var(--AccentCyanGlow);
+}
 
 #SearchScroll {
-    height: 100%;
-    width: 95%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 93%;
     align-self: center;
-    background-color: rgb(50, 50, 50);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    border-radius: 5px;
+    background-color: var(--BackgroundSunken);
+    box-shadow: var(--ShadowInsetDepth);
 }
+#SearchScroll::-webkit-scrollbar { width: 6px; }
+#SearchScroll::-webkit-scrollbar-track { background: var(--BackgroundSunken); }
+#SearchScroll::-webkit-scrollbar-thumb { background: var(--BorderBright); border-radius: 3px; }
+#SearchScroll::-webkit-scrollbar-thumb:hover { background: var(--TextMuted); }
 
 #SearchScrollPage {
     display: flex;
@@ -257,21 +333,29 @@ html, body {
     height: 45px;
     width: 55%;
     margin: 10px 0;
-    background-color: rgb(70, 70, 70);
     align-items: center;
     justify-content: center;
     align-self: center;
     gap: 5px;
     border-radius: 7px;
+    background-color: var(--BackgroundSunken);
+    border: 1px solid var(--BorderDim);
+    box-shadow: var(--ShadowCardAmbient);
 }
 
 .PageBtn {
     height: 33px;
     width: 33px;
-    border: none;
-    background-color: rgb(40, 40, 40);
-    color: rgb(200, 200, 200);
     border-radius: 5px;
+    background-color: var(--BackgroundRaised);
+    color: var(--TextSecondary);
+    border: 1px solid var(--BorderDim);
+}
+
+.PageBtn:hover {
+    background-color: var(--BackgroundHover);
+    color: var(--TextPrimary);
+    border: 1px solid var(--TextMuted);
 }
 
 #PageNo {
@@ -281,8 +365,77 @@ html, body {
     align-items: center;
     justify-content: center;
     border-radius: 5px;
-    background-color: rgb(120, 120, 120);
-    color: rgb(220, 220, 220);
     font-size: 16px;
     font-weight: 600;
+    background-color: var(--BackgroundRaised);
+    color: var(--TextPrimary);
+    border: 1px solid var(--BorderDim);
 }
+
+.SatCard {
+    display: flex;
+    width: 95%;
+    height: 90px;
+    margin: 5px auto;
+    border-radius: 5px;
+    align-items: center;
+    cursor: pointer;
+    background-color: var(--BackgroundRaised);
+    border: 1px solid var(--BorderDim);
+    box-shadow: var(--ShadowCardAmbient);
+}
+
+.SatCard:hover {
+    background-color: var(--BackgroundHover);
+    border-color: var(--BorderGlow);
+    box-shadow: 0 4px 14px hsla(0, 0%, 0%, 0.6), 0 0 10px hsla(95, 100%, 45%, 0.15);
+}
+
+.SatCard img {
+    height: 80px;
+    width: 80px;
+    margin: 5px;
+    border-radius: 5px;
+    background-color: var(--BackgroundSunken);
+    border: 1px solid var(--BorderDim);
+}
+
+.SatCard .SatCardDetails {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 5px;
+}
+
+.SatCard .SatName {
+    font-size: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 3px;
+    margin-bottom: 5px;
+    color: var(--TextPrimary);
+    text-shadow: var(--TextShadowHeading);
+}
+
+.SatCard .CountryDetails, .SatCard .IdDetails {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.SatCard .CountryDetails span, 
+.SatCard .IdDetails span {
+    font-family: sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--TextSecondary);
+}
+.SatCard .Country, .SatCard .Norad {width: 77px;}
