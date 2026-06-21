@@ -28,4 +28,6 @@ dist-ssr
 .env.local
 .env.*.local
 .env*
+.wakatime-project
+.gitignore
 test.py

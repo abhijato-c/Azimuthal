@@ -22,9 +22,12 @@ const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 let Countries = {}
 let Sites = {}
 let PastUpdate = JulianDate.now();
+let PageIndex = 0;
+let PageLength = 50;
+let ActiveIds = null;
 
 async function Init(){
-	const Request = await fetch('api/FetchCountries');
+	const Request = await fetch('/api/FetchCountries');
 	const Response = await Request.json();
 	Countries = Response.Countries;
 	Sites = Response.Sites;
@@ -57,13 +60,15 @@ async function Init(){
 			pixelSize: 4,
 			id: sat.norad_id
 		});
-		SatEntries.set(sat.norad_id, {Point, SatRec});
+		const Details = sat;
+		SatEntries.set(sat.norad_id, {Point, SatRec, Details});
 	});
+
+	window.Search();
 
 	console.log('Tracking');
 	TrackingLoop();
 
-	// Dismiss loading screen
 	setTimeout(() => document.getElementById('LoadingOverlay').remove(), 300);
 }
 
@@ -72,13 +77,13 @@ function TrackingLoop(){
 		if (Math.abs(JulianDate.secondsDifference(time, PastUpdate)) < 0.1) return;
 
 		PastUpdate = time;
-		const Date = JulianDate.toDate(time);
-		const gmst = satellite.gstime(Date);
+		const Julian = JulianDate.toDate(time);
+		const gmst = satellite.gstime(Julian);
 
 		for (const sat of SatEntries.values()){
 			if (!sat.Point.show) continue;
 
-			const PV = satellite.propagate(sat.SatRec, Date);
+			const PV = satellite.propagate(sat.SatRec, Julian);
 			if (!PV || !PV.position) continue;
 			const PosEci = PV.position;
 			if (PosEci){
@@ -91,6 +96,35 @@ function TrackingLoop(){
 			}
 		}
 	});
+}
+
+function RenderPage(){
+	var SatList = document.getElementById("SearchScroll");
+	SatList.innerHTML = "";
+
+	for (let i = PageIndex * PageLength; i < ActiveIds.length && i < (PageIndex + 1) * PageLength; ++i){
+		const sat = SatEntries.get(ActiveIds[i])
+
+		const tab = document.createElement('div');
+		tab.className = "SatCard";
+		tab.innerHTML = `
+			<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSSXsRTl4fxB9zeceEeEcRLo2yxlLJMSeqww&s" alt="Satellite">
+			<div class="SatCardDetails">
+				<span class="SatName">${sat.Details.name}</span>
+				<div class="DetailsLine">
+					<span class="Country">Country: ${sat.Details.country}</span>
+					<span class="Site">Site: ${sat.Details.launch_site}</span>
+				</div>
+				<div class="DetailsLine">
+					<span class="Norad">NORAD: ${sat.Details.norad_id}</span>
+					<span class="Site">INTL: ${sat.Details.intl_designator}</span>
+				</div>
+			</div>
+		`;
+		SatList.append(tab);
+	}
+
+	document.getElementById("PageNo").innerText = String(PageIndex * PageLength + 1) + '-' + String(Math.min(ActiveIds.length, (PageIndex + 1) * PageLength)) + ' / ' + String(ActiveIds.length);
 }
 
 window.Search = async function (){
@@ -119,8 +153,30 @@ window.Search = async function (){
 
 	var IDs = await resp.json();
 	IDs = new Set(IDs);
-	for (const [id, data] of SatEntries.entries())
-		data.Point.show = IDs.has(id);
+	ActiveIds = Array.from(IDs);
+
+	const Julian = JulianDate.toDate(viewer.clock.currentTime);
+	const gmst = satellite.gstime(Julian);
+	
+	for (const [id, sat] of SatEntries.entries()) {
+		sat.Point.show = IDs.has(id);
+		if (!sat.Point.show) continue;
+
+		const PV = satellite.propagate(sat.SatRec, Julian);
+		if (!PV || !PV.position) continue;
+		const PosEci = PV.position;
+		if (PosEci){
+			const Geodetic = satellite.eciToGeodetic(PosEci, gmst);
+			sat.Point.position = Cartesian3.fromRadians(
+				Geodetic.longitude,
+				Geodetic.latitude, 
+				Geodetic.height * 1000
+			);
+		}
+	}
+
+	PageIndex = 0;
+	RenderPage();
 }
 
 window.ToggleSidebar = function(ID){
@@ -131,6 +187,14 @@ window.ToggleSidebar = function(ID){
 
 window.ToggleMultiselect = function(ID){
 	document.getElementById(ID).classList.toggle('open');
+}
+
+window.PageTurn = function(Next) {
+	if (Next)
+		PageIndex += 1;
+	else
+		PageIndex -=1;
+	RenderPage();
 }
 
 window.UpdateCountrySelection = function(){

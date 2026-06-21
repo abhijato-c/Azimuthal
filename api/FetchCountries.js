@@ -14,7 +14,7 @@ export default async function handler(req, res) {
         if (CountryResponse.ok)
             JCountries = await CountryResponse.json();
         else
-            throw new Error('Failed to fetch countries:' + response.statusText);
+            throw new Error('Failed to fetch countries:' + CountryResponse.statusText);
 
         const SiteResponse = await fetch(SITE_URL, {
             headers: {'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`}
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
         if (SiteResponse.ok)
             JSites = await SiteResponse.json();
         else
-            throw new Error('Failed to fetch Sites:' + response.statusText);
+            throw new Error('Failed to fetch Sites:' + SiteResponse.statusText);
 
         return res.status(200).json({Countries: JCountries, Sites: JSites});
     }
