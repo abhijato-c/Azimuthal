@@ -121,6 +121,7 @@ function RenderPage(){
 				</div>
 			</div>
 		`;
+		tab.onclick = () => SatClicked(ActiveIds[i]);
 		SatList.append(tab);
 	}
 
@@ -154,6 +155,11 @@ window.Search = async function (){
 	var IDs = await resp.json();
 	IDs = new Set(IDs);
 	ActiveIds = Array.from(IDs);
+	ActiveIds.sort((A, B) => {
+		const NameA = SatEntries.get(A).Details.name;
+		const NameB = SatEntries.get(B).Details.name;
+		return NameA.localeCompare(NameB);
+	});
 
 	const Julian = JulianDate.toDate(viewer.clock.currentTime);
 	const gmst = satellite.gstime(Julian);
@@ -177,6 +183,34 @@ window.Search = async function (){
 
 	PageIndex = 0;
 	RenderPage();
+}
+
+window.SatClicked = async function (SatId) {
+	const resp = await fetch('/api/FetchDetails', {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json'},
+		body: JSON.stringify({id: SatId})
+	});
+	if (!resp.ok) {
+		return;
+	}
+	var details = await resp.json();
+
+	const Sidebar = document.getElementById('RightSidebar');
+	Sidebar.classList.add("open");
+	setTimeout(() => viewer.resize(), 400);
+
+	document.getElementById("SatName").textContent = details.name;
+	document.getElementById("DetailNorad").textContent = details.norad_id;
+	document.getElementById("DetailIntl").textContent = details.intl_designator;
+	document.getElementById("DetailDate").textContent = details.launch_date.split('T')[0];
+	document.getElementById("DetailCountry").textContent = details.country;
+	document.getElementById("DetailSite").textContent = details.launch_site;
+	document.getElementById("DetailApoapsis").textContent = details.apoapsis;
+	document.getElementById("DetailPeriapsis").textContent = details.periapsis;
+	document.getElementById("DetailInclination").textContent = details.inclination;
+	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
+	document.getElementById("DetailPeriod").textContent = details.period;
 }
 
 window.ToggleSidebar = function(ID){

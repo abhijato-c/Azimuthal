@@ -350,6 +350,7 @@ html, body {
     background-color: var(--BackgroundRaised);
     color: var(--TextSecondary);
     border: 1px solid var(--BorderDim);
+    cursor: pointer;
 }
 
 .PageBtn:hover {
@@ -439,3 +440,77 @@ html, body {
     color: var(--TextSecondary);
 }
 .SatCard .Country, .SatCard .Norad {width: 77px;}
+
+#RightSidebar.open {
+    overflow-y: scroll;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+}
+
+#RightSidebar img {
+    width: 300px;
+    height: 300px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+#SatName {
+    font-size: 30px;
+    font-family: sans-serif;
+    font-weight: 600;
+    margin-bottom: 15px;
+    margin-left: 5px;
+    color: var(--TextPrimary);
+}
+
+.AccordionSection {
+    overflow: hidden;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background-color: var(--BackgroundSunken);
+    border: 1px solid var(--BorderBright);
+}
+
+.AccordionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    font-family: sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    background-color: var(--BackgroundRaised);
+    color: var(--TextPrimary);
+    border: 1px solid var(--BorderBright);
+}
+.AccordionHeader:hover { background-color: var(--BackgroundHover); }
+.AccordionHeader::-webkit-details-marker, .AccordionHeader::marker { display: none; }
+
+.AccordionArrow {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+    color: var(--TextSecondary);
+}
+.AccordionSection[open] .AccordionArrow { transform: rotate(180deg); }
+
+.AccordionContent {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    gap: 3px;
+    background-color: var(--BackgroundSunken);
+}
+
+.DetailRow {
+    display: flex;
+    justify-content: space-between;
+    font-family: sans-serif;
+    font-size: 14px;
+    padding-bottom: 4px;
+    padding-right: 80px;
+    color: var(--TextSecondary);
+}
