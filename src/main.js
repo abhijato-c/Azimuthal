@@ -1,5 +1,5 @@
-import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection } from 'cesium';
-import * as satellite from 'satellite.js';
+import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere } from 'cesium';
+import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 
 Ion.defaultAccessToken = import.meta.env.VITE_token;
 const viewer = new Viewer('cesiumContainer', {
@@ -11,12 +11,16 @@ const viewer = new Viewer('cesiumContainer', {
 	navigationHelpButton: false,
 	geocoder: false,
 	fullscreenButton: false,
-	shouldAnimate: true,
+	shouldAnimate: false,
 	projectionPicker: false,
 	sceneModePicker: false,
 	scene3DOnly: true,
-})
+	requestRenderMode: false,
+});
+viewer.resolutionScale = window.devicePixelRatio;
+viewer.scene.screenSpaceCameraController.maximumZoomDistance = 5e8;
 
+const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const SatEntries = new Map();
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 let Countries = {}
@@ -25,6 +29,16 @@ let PastUpdate = JulianDate.now();
 let PageIndex = 0;
 let PageLength = 50;
 let ActiveIds = null;
+let TrackingId = null;
+let TrackingEntity = viewer.entities.add({
+	id: "Tracker",
+	position: new CallbackProperty((time, res) => {
+		if (TrackingId) return SatEntries.get(TrackingId).Point.position;
+		return undefined;
+	}, false),
+	viewFrom: new Cartesian3(0, -500000, 500000),
+	point: { pixelSize: 0 }
+});
 
 async function Init(){
 	const Request = await fetch('/api/FetchCountries');
@@ -53,11 +67,12 @@ async function Init(){
 
 	console.log('Initializing satellites');
 	results.forEach(sat => {
-		const SatRec = satellite.twoline2satrec(sat.tle_line1, sat.tle_line2);
+		const SatRec = twoline2satrec(sat.tle_line1, sat.tle_line2);
 		const Point = Points.add({
 			position: Cartesian3.ZERO,
-			color: Color.BLUE,
-			pixelSize: 4,
+			color: Color.fromCssColorString('#00a8ff').withAlpha(0.8),
+			pixelSize: 12,
+			scaleByDistance: new NearFarScalar(1.0e5, 1.0, 2.0e7, 0.2),
 			id: sat.norad_id
 		});
 		const Details = sat;
@@ -69,25 +84,23 @@ async function Init(){
 	console.log('Tracking');
 	TrackingLoop();
 
-	setTimeout(() => document.getElementById('LoadingOverlay').remove(), 300);
+	document.getElementById('LoadingOverlay').remove();
 }
 
 function TrackingLoop(){
 	viewer.scene.preUpdate.addEventListener((scene, time) => {
-		if (Math.abs(JulianDate.secondsDifference(time, PastUpdate)) < 0.1) return;
-
-		PastUpdate = time;
+		if (!viewer.clockViewModel.shouldAnimate) return;
 		const Julian = JulianDate.toDate(time);
-		const gmst = satellite.gstime(Julian);
+		const gmst = gstime(Julian);
 
 		for (const sat of SatEntries.values()){
 			if (!sat.Point.show) continue;
 
-			const PV = satellite.propagate(sat.SatRec, Julian);
+			const PV = propagate(sat.SatRec, Julian);
 			if (!PV || !PV.position) continue;
 			const PosEci = PV.position;
 			if (PosEci){
-				const Geodetic = satellite.eciToGeodetic(PosEci, gmst);
+				const Geodetic = eciToGeodetic(PosEci, gmst);
 				sat.Point.position = Cartesian3.fromRadians(
 					Geodetic.longitude,
 					Geodetic.latitude, 
@@ -97,6 +110,16 @@ function TrackingLoop(){
 		}
 	});
 }
+
+handler.setInputAction(function (event) {
+	const obj = viewer.scene.pick(event.position);
+	if (obj && obj.primitive && obj.primitive.id) {
+		SatClicked(obj.primitive.id);
+	}
+	else {
+		ResetTrack();
+	}
+}, ScreenSpaceEventType.LEFT_CLICK);
 
 function RenderPage(){
 	var SatList = document.getElementById("SearchScroll");
@@ -125,7 +148,10 @@ function RenderPage(){
 		SatList.append(tab);
 	}
 
-	document.getElementById("PageNo").innerText = String(PageIndex * PageLength + 1) + '-' + String(Math.min(ActiveIds.length, (PageIndex + 1) * PageLength)) + ' / ' + String(ActiveIds.length);
+	const first = String(PageIndex * PageLength + 1);
+	const last = String(Math.min(ActiveIds.length, (PageIndex + 1) * PageLength));
+	const max = String(ActiveIds.length);
+	document.getElementById("PageNo").innerText = first + '-' + last + ' / ' + max;
 }
 
 window.Search = async function (){
@@ -162,17 +188,17 @@ window.Search = async function (){
 	});
 
 	const Julian = JulianDate.toDate(viewer.clock.currentTime);
-	const gmst = satellite.gstime(Julian);
+	const gmst = gstime(Julian);
 	
 	for (const [id, sat] of SatEntries.entries()) {
 		sat.Point.show = IDs.has(id);
 		if (!sat.Point.show) continue;
 
-		const PV = satellite.propagate(sat.SatRec, Julian);
+		const PV = propagate(sat.SatRec, Julian);
 		if (!PV || !PV.position) continue;
 		const PosEci = PV.position;
 		if (PosEci){
-			const Geodetic = satellite.eciToGeodetic(PosEci, gmst);
+			const Geodetic = eciToGeodetic(PosEci, gmst);
 			sat.Point.position = Cartesian3.fromRadians(
 				Geodetic.longitude,
 				Geodetic.latitude, 
@@ -186,6 +212,9 @@ window.Search = async function (){
 }
 
 window.SatClicked = async function (SatId) {
+	window.ResetTrack();
+	document.getElementById("SatName").textContent = "Loading...";
+
 	const resp = await fetch('/api/FetchDetails', {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json'},
@@ -211,6 +240,34 @@ window.SatClicked = async function (SatId) {
 	document.getElementById("DetailInclination").textContent = details.inclination;
 	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
 	document.getElementById("DetailPeriod").textContent = details.period;
+
+	TrackingId = SatId;
+	viewer.trackedEntity = TrackingEntity;
+	viewer.camera.flyToBoundingSphere(
+		new BoundingSphere(SatEntries.get(SatId).Point.position, 500000),
+		{ duration: 1 }
+	);
+}
+
+window.ResetTrack = function() {
+	const Sidebar = document.getElementById('RightSidebar');
+	Sidebar.classList.remove("open");
+	setTimeout(() => viewer.resize(), 400);
+
+	document.getElementById("SatName").textContent = "No Satellite Selected";
+	document.getElementById("DetailNorad").textContent = "";
+	document.getElementById("DetailIntl").textContent = "";
+	document.getElementById("DetailDate").textContent = "";
+	document.getElementById("DetailCountry").textContent = "";
+	document.getElementById("DetailSite").textContent = "";
+	document.getElementById("DetailApoapsis").textContent = "";
+	document.getElementById("DetailPeriapsis").textContent = "";
+	document.getElementById("DetailInclination").textContent = "";
+	document.getElementById("DetailEccentricity").textContent = "";
+	document.getElementById("DetailPeriod").textContent = "";
+
+	TrackingId = null;
+	viewer.trackedEntity = undefined;
 }
 
 window.ToggleSidebar = function(ID){
