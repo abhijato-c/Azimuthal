@@ -141,7 +141,7 @@ function RenderPage(){
 		const tab = document.createElement('div');
 		tab.className = "SatCard";
 		tab.innerHTML = `
-			<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSSXsRTl4fxB9zeceEeEcRLo2yxlLJMSeqww&s" alt="Satellite">
+			<img src="${GetSatImage(sat.Details.name)}" alt="Satellite">
 			<div class="SatCardDetails">
 				<span class="SatName">${sat.Details.name}</span>
 				<div class="DetailsLine">
@@ -162,6 +162,17 @@ function RenderPage(){
 	const last = String(Math.min(ActiveIds.length, (PageIndex + 1) * PageLength));
 	const max = String(ActiveIds.length);
 	document.getElementById("PageNo").innerText = first + '-' + last + ' / ' + max;
+}
+
+function GetSatImage(Name) {
+	Name = Name.toUpperCase();
+
+	const modules = import.meta.glob('/src/assets/Satellites/*.png', { eager: true });
+	const names = Object.keys(modules).map((path) => {
+		return path.split('/').at(-1).slice(0, -4);
+	})
+	const match = names.find(exp => Name.includes(exp));
+	return match ? `src/assets/Satellites/${match}.png` : 'src/assets/Satellites/GENERIC.png';
 }
 
 window.Search = async function (){
@@ -239,6 +250,7 @@ window.SatClicked = async function (SatId) {
 	Sidebar.classList.add("open");
 	setTimeout(() => viewer.resize(), 400);
 
+	document.getElementById("SatImg").src = GetSatImage(details.name);
 	document.getElementById("SatName").textContent = details.name;
 	document.getElementById("DetailNorad").textContent = details.norad_id;
 	document.getElementById("DetailIntl").textContent = details.intl_designator;
