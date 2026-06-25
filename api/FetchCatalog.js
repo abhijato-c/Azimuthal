@@ -9,6 +9,10 @@ export default async function handler(req, res) {
         let query = 'SELECT norad_id FROM satellites';
         if (Object.keys(filters).length > 0) {
             query += ' WHERE';
+            if (filters.Name && filters.Name.trim() != ''){
+                const term = filters.Name.trim();
+                query += ` name ILIKE '%' || '${term}' || '%' AND`;
+            }
             if (filters.Country) {
                 const InList = filters.Country.map(c => `'${c}'`).join(', ');
                 query += ` country IN (${InList}) AND`;

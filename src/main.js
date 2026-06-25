@@ -1,8 +1,7 @@
-import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer } from 'cesium';
+import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer, Check } from 'cesium';
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 
 Ion.defaultAccessToken = import.meta.env.VITE_token;
-console.log(import.meta.env.VITE_MAPTILER_KEY);
 const viewer = new Viewer('cesiumContainer', {
 	baseLayer: new ImageryLayer(new UrlTemplateImageryProvider({
 		url: `https://api.maptiler.com/maps/hybrid-v4/{z}/{x}/{y}.jpg?key=${import.meta.env.VITE_MAPTILER_KEY}`
@@ -50,6 +49,10 @@ let TrackingEntity = viewer.entities.add({
 	point: { pixelSize: 0 }
 });
 
+const ImageNames = Object.keys(import.meta.glob('/src/assets/Satellites/*.png', { eager: true })).map((path) => {
+	return path.split('/').at(-1).slice(0, -4);
+})
+
 async function Init(){
 	const Request = await fetch('/api/FetchCountries');
 	const Response = await Request.json();
@@ -60,6 +63,15 @@ async function Init(){
 	Countries = Object.fromEntries(SortedCountries);
 	
 	const Options = document.getElementById('CountryOptions');
+
+	const SelectAll = document.createElement('label');
+	SelectAll.className = 'MultiselectItem';
+	SelectAll.innerHTML = `
+		<input type="checkbox" value="All" id="CountrySelectAll" checked onchange="CountrySelectAll()">
+		<span>Select All</span>
+	`;
+	Options.append(SelectAll);
+
 	Object.entries(Countries).forEach(([name, code]) => {
 		const label = document.createElement('label');
 		label.className = 'MultiselectItem';
@@ -166,12 +178,7 @@ function RenderPage(){
 
 function GetSatImage(Name) {
 	Name = Name.toUpperCase();
-
-	const modules = import.meta.glob('/src/assets/Satellites/*.png', { eager: true });
-	const names = Object.keys(modules).map((path) => {
-		return path.split('/').at(-1).slice(0, -4);
-	})
-	const match = names.find(exp => Name.includes(exp));
+	const match = ImageNames.find(exp => Name.includes(exp));
 	return match ? `src/assets/Satellites/${match}.png` : 'src/assets/Satellites/GENERIC.png';
 }
 
@@ -181,8 +188,8 @@ window.Search = async function (){
 	let ToDate = document.getElementById("LaunchDateTo").valueAsDate;
 	let ElementCountries = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
 	let ElementSites = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked');
-	let SelectedCountries = [];
-	let SelectedSites = [];
+	let SelectedCountries = ['bugfix'];
+	let SelectedSites = ['bugfix'];
 
 	if (!FromDate) FromDate = new Date(1900, 0, 0);
 	if (!ToDate) ToDate = new Date();
@@ -307,6 +314,7 @@ window.ResetTrack = function() {
 	Sidebar.classList.remove("open");
 	setTimeout(() => viewer.resize(), 400);
 
+	document.getElementById("SatImg").src = GetSatImage('Minceraft');
 	document.getElementById("SatName").textContent = "No Satellite Selected";
 	document.getElementById("DetailNorad").textContent = "";
 	document.getElementById("DetailIntl").textContent = "";
@@ -339,33 +347,75 @@ window.ToggleMultiselect = function(ID){
 }
 
 window.PageTurn = function(Next) {
-	if (Next)
+	if (Next && PageIndex < Math.trunc(ActiveIds.length / PageLength))
 		PageIndex += 1;
-	else
+	else if (!Next && PageIndex > 0)
 		PageIndex -=1;
 	RenderPage();
 }
 
 window.UpdateCountrySelection = function(){
 	const Selected = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
+
+	let count = Selected.length;
+	if (document.getElementById('CountrySelectAll').checked) count -= 1;
+	document.getElementById("CountryMultiselectLabel").textContent = count + ' selected';
+
 	let LaunchSites = new Set();
 	Selected.forEach((cb) => {
-		const CountryName = cb.value;
-		Sites[CountryName].forEach(Site => LaunchSites.add(Site));
+		if (cb.value == 'All') return;
+		Sites[cb.value].forEach(Site => LaunchSites.add(Site));
 	});
 	
 	LaunchSites = Array.from(LaunchSites).sort();
 	const SiteOptions = document.getElementById('SiteOptions');
 	SiteOptions.innerHTML = '';
+
+	const SelectAll = document.createElement('label');
+	SelectAll.className = 'MultiselectItem';
+	SelectAll.innerHTML = `
+		<input type="checkbox" value="All" id="SiteSelectAll" checked onchange="SiteSelectAll()">
+		<span>Select All</span>
+	`;
+	SiteOptions.append(SelectAll);
+	
 	for (const Site of LaunchSites) {
 		const label = document.createElement('label');
 		label.className = 'MultiselectItem';
 		label.innerHTML = `
-            <input type="checkbox" value="${Site}" checked>
+            <input type="checkbox" value="${Site}" checked onchange="UpdateSiteSelection()">
             <span>${Site}</span>
         `;
 		SiteOptions.append(label);
 	}
+	UpdateSiteSelection();
+}
+
+window.UpdateSiteSelection = function(){
+	const Selected = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked');
+	let count = Selected.length;
+	if (document.getElementById('SiteSelectAll').checked) count -= 1;
+	document.getElementById("SiteMultiselectLabel").textContent = count + ' selected';
+}
+
+window.CountrySelectAll = function(){
+	const CountryOptions = document.getElementById('CountryOptions');
+	const Checkboxes = CountryOptions.querySelectorAll('input[type="checkbox"]');
+	const ToCheck = document.getElementById('CountrySelectAll').checked;
+	Checkboxes.forEach(cb => {
+		cb.checked = ToCheck;
+	});
+	UpdateCountrySelection();
+}
+
+window.SiteSelectAll = function(){
+	const SiteOptions = document.getElementById('SiteOptions');
+	const Checkboxes = SiteOptions.querySelectorAll('input[type="checkbox"]');
+	const ToCheck = document.getElementById('SiteSelectAll').checked;
+	Checkboxes.forEach(cb => {
+		cb.checked = ToCheck;
+	});
+	UpdateSiteSelection();
 }
 
 document.addEventListener('click', function(e) {
