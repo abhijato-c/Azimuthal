@@ -1,8 +1,12 @@
-import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere } from 'cesium';
+import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer } from 'cesium';
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 
 Ion.defaultAccessToken = import.meta.env.VITE_token;
+console.log(import.meta.env.VITE_MAPTILER_KEY);
 const viewer = new Viewer('cesiumContainer', {
+	baseLayer: new ImageryLayer(new UrlTemplateImageryProvider({
+		url: `https://api.maptiler.com/maps/hybrid-v4/{z}/{x}/{y}.jpg?key=${import.meta.env.VITE_MAPTILER_KEY}`
+	})),
 	baseLayerPicker: false,
 	fullScreenButton: false,
 	vrButton: false,
@@ -14,21 +18,27 @@ const viewer = new Viewer('cesiumContainer', {
 	shouldAnimate: false,
 	projectionPicker: false,
 	sceneModePicker: false,
-	scene3DOnly: true,
 	requestRenderMode: false,
+	skyAtmosphere: false,
+	scene3DOnly: true,
 });
 viewer.resolutionScale = window.devicePixelRatio;
 viewer.scene.screenSpaceCameraController.maximumZoomDistance = 5e8;
+viewer.scene.globe.showGroundAtmosphere = false;
+viewer.scene.globe.enableLighting = false;
+viewer.scene.atmosphere.show = false;
+viewer.scene.fog.enabled = false;
 
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const SatEntries = new Map();
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
+const Orbits = viewer.scene.primitives.add(new PolylineCollection());
 let Countries = {}
 let Sites = {}
-let PastUpdate = JulianDate.now();
 let PageIndex = 0;
 let PageLength = 50;
 let ActiveIds = null;
+let OrbitLine = null;
 let TrackingId = null;
 let TrackingEntity = viewer.entities.add({
 	id: "Tracker",
@@ -241,12 +251,43 @@ window.SatClicked = async function (SatId) {
 	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
 	document.getElementById("DetailPeriod").textContent = details.period;
 
+	const sat = SatEntries.get(SatId);
 	TrackingId = SatId;
 	viewer.trackedEntity = TrackingEntity;
 	viewer.camera.flyToBoundingSphere(
-		new BoundingSphere(SatEntries.get(SatId).Point.position, 500000),
+		new BoundingSphere(sat.Point.position, 500000),
 		{ duration: 1 }
 	);
+
+	const positions = [];
+	const mins = details.period;
+	const samples = 50 * 2;
+	const step = mins / samples / 2;
+	const satrec = sat.satrec;
+
+	for(let i = -samples; i <= samples; ++i) {
+		const offset = i * step;
+		const Time = new Date(JulianDate.toDate(viewer.clock.currentTime).getTime() + (offset * 60 * 1000));
+
+		const PV = propagate(sat.SatRec, Time);
+		if (!PV || !PV.position) continue;
+		const PosEci = PV.position;
+		if (PosEci){
+			const gmst = gstime(Time);
+			const Geodetic = eciToGeodetic(PosEci, gmst);
+			const cart = Cartesian3.fromRadians(
+				Geodetic.longitude,
+				Geodetic.latitude, 
+				Geodetic.height * 1000
+			);
+			positions.push(cart);
+		}
+	}
+	OrbitLine = Orbits.add({
+		positions: positions,
+		width: 3,
+		material: Material.fromType("Color", { color: Color.RED })
+	});
 }
 
 window.ResetTrack = function() {
@@ -268,6 +309,11 @@ window.ResetTrack = function() {
 
 	TrackingId = null;
 	viewer.trackedEntity = undefined;
+
+	if (OrbitLine != null) {
+		Orbits.remove(OrbitLine);
+		OrbitLine = null;
+	}
 }
 
 window.ToggleSidebar = function(ID){

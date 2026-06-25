@@ -510,10 +510,9 @@ html, body {
 
 .DetailRow {
     display: flex;
-    justify-content: space-between;
     font-family: sans-serif;
     font-size: 14px;
     padding-bottom: 4px;
-    padding-right: 80px;
     color: var(--TextSecondary);
 }
+.DetailKey { width: 100px; }
