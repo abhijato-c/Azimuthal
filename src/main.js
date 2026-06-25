@@ -32,6 +32,7 @@ const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const SatEntries = new Map();
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const Orbits = viewer.scene.primitives.add(new PolylineCollection());
+let ImageNames = [];
 let Countries = {}
 let Sites = {}
 let PageIndex = 0;
@@ -49,11 +50,11 @@ let TrackingEntity = viewer.entities.add({
 	point: { pixelSize: 0 }
 });
 
-const ImageNames = Object.keys(import.meta.glob('/src/assets/Satellites/*.png', { eager: true })).map((path) => {
-	return path.split('/').at(-1).slice(0, -4);
-})
 
-async function Init(){
+async function Init() {
+	const ImageReq = await fetch('/Satellites/ImageNames.json');
+	ImageNames = await ImageReq.json();
+
 	const Request = await fetch('/api/FetchCountries');
 	const Response = await Request.json();
 	Countries = Response.Countries;
@@ -179,7 +180,7 @@ function RenderPage(){
 function GetSatImage(Name) {
 	Name = Name.toUpperCase();
 	const match = ImageNames.find(exp => Name.includes(exp));
-	return match ? `src/assets/Satellites/${match}.png` : 'src/assets/Satellites/GENERIC.png';
+	return match ? `/Satellites/${match}.png` : '/Satellites/GENERIC.png';
 }
 
 window.Search = async function (){
