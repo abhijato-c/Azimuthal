@@ -2,6 +2,7 @@ import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, S
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 import SatWorker from '/helpers/SatWorker.js?worker';
 
+// Setup viewport and variables
 Ion.defaultAccessToken = import.meta.env.VITE_token;
 const viewer = new Viewer('cesiumContainer', {
 	baseLayer: new ImageryLayer(new UrlTemplateImageryProvider({
@@ -56,9 +57,11 @@ let TrackingEntity = viewer.entities.add({
 
 
 async function Init() {
+	// Get the list of images
 	const ImageReq = await fetch('/Satellites/ImageNames.json');
 	ImageNames = await ImageReq.json();
 
+	// Get the maps of countries to launch sites
 	const CountryReq = await fetch('/api/FetchCountries');
 	const CountryRes = await CountryReq.json();
 	Countries = CountryRes.Countries;
@@ -67,12 +70,12 @@ async function Init() {
 	const SortedCountries = Object.entries(Countries).sort((a, b) => a[0].localeCompare(b[0]));
 	Countries = Object.fromEntries(SortedCountries);
 	
+	// Set up the countries dropdown
 	const Options = document.getElementById('CountryOptions');
-
 	const SelectAll = document.createElement('label');
 	SelectAll.className = 'MultiselectItem';
 	SelectAll.innerHTML = `
-		<input type="checkbox" value="All" id="CountrySelectAll" checked onchange="CountrySelectAll()">
+		<input type="checkbox" value="All" id="CountrySelectAll" checked onclick="CountrySelectAll()">
 		<span>Select All</span>
 	`;
 	Options.append(SelectAll);
@@ -88,10 +91,12 @@ async function Init() {
 	});
 	window.UpdateCountrySelection();
 
+	// Get the initial catalog of data
 	console.log('Fetching initial data');
 	const CatalogReq = await fetch('/api/FetchInitial');
 	const CatalogRes = await CatalogReq.json();
 
+	// Initialize the local catalog
 	console.log('Initializing satellites');
 	const SatrecMap = new Map();
 	CatalogRes.forEach(sat => {
@@ -115,6 +120,7 @@ async function Init() {
 
 	await window.Search();
 
+	// Fires a request to update positions each tick
 	viewer.scene.preUpdate.addEventListener((scene, time) => {
 		if (!viewer.clockViewModel.shouldAnimate || WorkerBusy) return;
 		WorkerBusy = true;
@@ -134,6 +140,7 @@ function RenderPage(){
 	var SatList = document.getElementById("SearchScroll");
 	SatList.innerHTML = "";
 
+	// Adds sat card for each active id
 	for (let i = PageIndex * PageLength; i < ActiveIds.length && i < (PageIndex + 1) * PageLength; ++i){
 		const sat = SatEntries.get(ActiveIds[i])
 
@@ -157,6 +164,7 @@ function RenderPage(){
 		SatList.append(tab);
 	}
 
+	// Fills in the page index, forst and last index at the bottom
 	const first = String(PageIndex * PageLength + 1);
 	const last = String(Math.min(ActiveIds.length, (PageIndex + 1) * PageLength));
 	const max = String(ActiveIds.length);
@@ -186,6 +194,7 @@ Worker.onmessage = function(res) {
 }
 
 window.Search = async function (){
+	// Initialize all filters
 	let Name = document.getElementById("NameSearch").value;
 	let FromDate = document.getElementById("LaunchDateFrom").valueAsDate;
 	let ToDate = document.getElementById("LaunchDateTo").valueAsDate;
@@ -194,11 +203,13 @@ window.Search = async function (){
 	let SelectedCountries = ['bugfix'];
 	let SelectedSites = ['bugfix'];
 
+	// Fill in filters and defaults
 	if (!FromDate) FromDate = new Date(1900, 0, 0);
 	if (!ToDate) ToDate = new Date();
 	ElementCountries.forEach((cb) => { SelectedCountries.push(cb.value); });
 	ElementSites.forEach((cb) => { SelectedSites.push(cb.value); });
 
+	// Send request
 	let filter = {Name: Name, Country: SelectedCountries, Site: SelectedSites, Date: [FromDate, ToDate]};
 	const resp = await fetch('/api/FetchCatalog', {
 		method: 'POST',
@@ -206,11 +217,14 @@ window.Search = async function (){
 		body: JSON.stringify({filters: filter})
 	});
 
+	// Show/hide satellites
 	var IDs = await resp.json();
 	IDs = new Set(IDs);
 	for (const [id, sat] of SatEntries.entries()) {
 		sat.Point.show = IDs.has(id);
 	}
+
+	// Sort all ids alphabetically
 	ActiveIds = Array.from(IDs);
 	ActiveIds.sort((A, B) => {
 		const NameA = SatEntries.get(A).Details.name;
@@ -218,10 +232,11 @@ window.Search = async function (){
 		return NameA.localeCompare(NameB);
 	});
 
-
+	// Display the results in the sidebar
 	PageIndex = 0;
 	RenderPage();
 
+	// Update positions for scenario -> reshowing hidden satellites after time difference between the searches
 	if (!WorkerBusy) {
 		WorkerBusy = true;
 		const DateStr = JulianDate.toDate(viewer.clock.currentTime).toISOString();
@@ -235,9 +250,11 @@ window.Search = async function (){
 }
 
 window.SatClicked = async function (SatId) {
+	// Deselect
 	window.ResetTrack();
 	document.getElementById("SatName").textContent = "Loading...";
 
+	// Get data
 	const resp = await fetch('/api/FetchDetails', {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json'},
@@ -245,10 +262,12 @@ window.SatClicked = async function (SatId) {
 	});
 	var details = await resp.json();
 	
+	// Open sidebar
 	const Sidebar = document.getElementById('RightSidebar');
 	Sidebar.classList.add("open");
 	setTimeout(() => viewer.resize(), 400);
 	
+	// Set all values
 	document.getElementById("SatImg").src = GetSatImage(details.name);
 	document.getElementById("SatName").textContent = details.name;
 	document.getElementById("DetailNorad").textContent = details.norad_id;
@@ -262,6 +281,7 @@ window.SatClicked = async function (SatId) {
 	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
 	document.getElementById("DetailPeriod").textContent = details.period;
 	
+	// Set tracker and smoothly fly there
 	const sat = SatEntries.get(SatId);
 	TrackingId = SatId;
 	viewer.trackedEntity = TrackingEntity;
@@ -270,6 +290,7 @@ window.SatClicked = async function (SatId) {
 		{ duration: 1 }
 	);
 
+	// Compute orbital trajectory
 	const positions = [];
 	const mins = details.period;
 	const samples = 50 * 2;
@@ -302,10 +323,7 @@ window.SatClicked = async function (SatId) {
 }
 
 window.ResetTrack = function() {
-	const Sidebar = document.getElementById('RightSidebar');
-	Sidebar.classList.remove("open");
-	setTimeout(() => viewer.resize(), 400);
-
+	// Reset details
 	document.getElementById("SatImg").src = GetSatImage('Minceraft');
 	document.getElementById("SatName").textContent = "No Satellite Selected";
 	document.getElementById("DetailNorad").textContent = "";
@@ -319,6 +337,7 @@ window.ResetTrack = function() {
 	document.getElementById("DetailEccentricity").textContent = "";
 	document.getElementById("DetailPeriod").textContent = "";
 
+	// Reset tracking and orbit
 	TrackingId = null;
 	viewer.trackedEntity = undefined;
 	
@@ -327,6 +346,117 @@ window.ResetTrack = function() {
 		OrbitLine = null;
 	}
 }
+
+window.UpdateCountrySelection = function(){
+	const Selected = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
+	
+	// Get count of selected and total options
+	const total = document.querySelectorAll('#CountryOptions input[type="checkbox"]').length - 1;
+	let count = Selected.length;
+	if (document.getElementById('CountrySelectAll').checked) count -= 1;
+
+	// Logic for setting and unsetting select all box
+	if (count == 0) {
+		document.getElementById('CountrySelectAll').checked = false;
+		document.getElementById("CountryMultiselectLabel").textContent = "0 SELECTED!";
+	}
+	else if (count == total) {
+		document.getElementById('CountrySelectAll').checked = true;
+		document.getElementById("CountryMultiselectLabel").textContent = "All Selected";
+	}
+	else {
+		document.getElementById('CountrySelectAll').checked = true;
+		document.getElementById("CountryMultiselectLabel").textContent = count + ' selected';
+	}
+
+	// Make list of all available launch sites
+	let LaunchSites = new Set();
+	Selected.forEach((cb) => {
+		if (cb.value == 'All') return;
+		Sites[cb.value].forEach(Site => LaunchSites.add(Site));
+	});
+
+	// Populate launch site options
+	const SiteOptions = document.getElementById('SiteOptions');
+	SiteOptions.innerHTML = '';
+
+	const SelectAll = document.createElement('label');
+	SelectAll.className = 'MultiselectItem';
+	SelectAll.innerHTML = `
+	<input type="checkbox" value="All" id="SiteSelectAll" checked onclick="SiteSelectAll()">
+	<span>Select All</span>
+	`;
+	SiteOptions.append(SelectAll);
+	
+	for (const Site of LaunchSites) {
+		const label = document.createElement('label');
+		label.className = 'MultiselectItem';
+		label.innerHTML = `
+            <input type="checkbox" value="${Site}" checked onchange="UpdateSiteSelection()">
+            <span>${Site}</span>
+			`;
+		SiteOptions.append(label);
+	}
+	UpdateSiteSelection();
+}
+
+window.UpdateSiteSelection = function() {
+	// Get count of selected and total options
+	const total = document.querySelectorAll('#SiteOptions input[type="checkbox"]').length - 1;
+	let count = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked').length;
+	if (document.getElementById('SiteSelectAll').checked) count -= 1;
+
+	// Logic for setting and unsetting select all box
+	if (count == 0) {
+		document.getElementById('SiteSelectAll').checked = false;
+		document.getElementById("SiteMultiselectLabel").textContent = "0 SELECTED!";
+	}
+	else if (count == total) {
+		document.getElementById('SiteSelectAll').checked = true;
+		document.getElementById("SiteMultiselectLabel").textContent = "All Selected";
+	}
+	else {
+		document.getElementById('SiteSelectAll').checked = true;
+		document.getElementById("SiteMultiselectLabel").textContent = count + ' selected';
+	}
+}
+
+window.CountrySelectAll = function(){
+	const CountryOptions = document.getElementById('CountryOptions');
+	const Checkboxes = CountryOptions.querySelectorAll('input[type="checkbox"]');
+	const ToCheck = document.getElementById('CountrySelectAll').checked;
+	Checkboxes.forEach(cb => { cb.checked = ToCheck; });
+	UpdateCountrySelection();
+}
+
+window.SiteSelectAll = function(){
+	const SiteOptions = document.getElementById('SiteOptions');
+	const Checkboxes = SiteOptions.querySelectorAll('input[type="checkbox"]');
+	const ToCheck = document.getElementById('SiteSelectAll').checked;
+	Checkboxes.forEach(cb => { cb.checked = ToCheck; });
+	UpdateSiteSelection();
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', function(e) {
+	const Country = document.getElementById('CountrySelectContainer');
+	const Site = document.getElementById('SiteSelectContainer');
+    if (!Country.contains(e.target))
+        document.getElementById('CountryOptions').classList.remove('open');
+    if (!Site.contains(e.target))
+        document.getElementById('SiteOptions').classList.remove('open');
+});
+
+// Track or untrack sat on viewport click
+handler.setInputAction(function (event) {
+	const obj = viewer.scene.pick(event.position);
+	if (obj && obj.primitive && obj.primitive.id) {
+		SatClicked(obj.primitive.id);
+	}
+	else {
+		ResetTrack();
+	}
+}, ScreenSpaceEventType.LEFT_CLICK);
 
 window.ToggleSidebar = function(ID){
 	const Sidebar = document.getElementById(ID);
@@ -345,88 +475,5 @@ window.PageTurn = function(Next) {
 		PageIndex -=1;
 	RenderPage();
 }
-
-window.UpdateCountrySelection = function(){
-	const Selected = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
-	
-	let count = Selected.length;
-	if (document.getElementById('CountrySelectAll').checked) count -= 1;
-	document.getElementById("CountryMultiselectLabel").textContent = count + ' selected';
-	
-	let LaunchSites = new Set();
-	Selected.forEach((cb) => {
-		if (cb.value == 'All') return;
-		Sites[cb.value].forEach(Site => LaunchSites.add(Site));
-	});
-	
-	LaunchSites = Array.from(LaunchSites).sort();
-	const SiteOptions = document.getElementById('SiteOptions');
-	SiteOptions.innerHTML = '';
-	
-	const SelectAll = document.createElement('label');
-	SelectAll.className = 'MultiselectItem';
-	SelectAll.innerHTML = `
-	<input type="checkbox" value="All" id="SiteSelectAll" checked onchange="SiteSelectAll()">
-	<span>Select All</span>
-	`;
-	SiteOptions.append(SelectAll);
-	
-	for (const Site of LaunchSites) {
-		const label = document.createElement('label');
-		label.className = 'MultiselectItem';
-		label.innerHTML = `
-            <input type="checkbox" value="${Site}" checked onchange="UpdateSiteSelection()">
-            <span>${Site}</span>
-			`;
-		SiteOptions.append(label);
-	}
-	UpdateSiteSelection();
-}
-
-window.UpdateSiteSelection = function(){
-	const Selected = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked');
-	let count = Selected.length;
-	if (document.getElementById('SiteSelectAll').checked) count -= 1;
-	document.getElementById("SiteMultiselectLabel").textContent = count + ' selected';
-}
-
-window.CountrySelectAll = function(){
-	const CountryOptions = document.getElementById('CountryOptions');
-	const Checkboxes = CountryOptions.querySelectorAll('input[type="checkbox"]');
-	const ToCheck = document.getElementById('CountrySelectAll').checked;
-	Checkboxes.forEach(cb => {
-		cb.checked = ToCheck;
-	});
-	UpdateCountrySelection();
-}
-
-window.SiteSelectAll = function(){
-	const SiteOptions = document.getElementById('SiteOptions');
-	const Checkboxes = SiteOptions.querySelectorAll('input[type="checkbox"]');
-	const ToCheck = document.getElementById('SiteSelectAll').checked;
-	Checkboxes.forEach(cb => {
-		cb.checked = ToCheck;
-	});
-	UpdateSiteSelection();
-}
-
-document.addEventListener('click', function(e) {
-	const Country = document.getElementById('CountrySelectContainer');
-	const Site = document.getElementById('SiteSelectContainer');
-    if (!Country.contains(e.target))
-        document.getElementById('CountryOptions').classList.remove('open');
-    if (!Site.contains(e.target))
-        document.getElementById('SiteOptions').classList.remove('open');
-});
-
-handler.setInputAction(function (event) {
-	const obj = viewer.scene.pick(event.position);
-	if (obj && obj.primitive && obj.primitive.id) {
-		SatClicked(obj.primitive.id);
-	}
-	else {
-		ResetTrack();
-	}
-}, ScreenSpaceEventType.LEFT_CLICK);
 
 Init();
