@@ -18,9 +18,9 @@ const viewer = new Viewer('cesiumContainer', {
 	fullscreenButton: false,
 	projectionPicker: false,
 	sceneModePicker: false,
-	requestRenderMode: false,
 	skyAtmosphere: false,
 	shouldAnimate: true,
+	requestRenderMode: true,
 	scene3DOnly: true,
 });
 viewer.resolutionScale = window.devicePixelRatio;
@@ -58,8 +58,6 @@ const HoverHighlight = Points.add({
 	id: "HoverHighlight"
 });
 
-let WorkerBusy = false;
-let PositionsBuffer = null;
 let ImageNames = [];
 let Countries = {};
 let Sites = {};
@@ -68,6 +66,18 @@ let ActiveIds = null;
 let OrbitLine = null;
 let TrackingId = null;
 let MousePosition = null;
+
+// Position interpolation
+const CacheDuration = 30000;
+const SafetyBuffer = 5000;
+let CacheT0 = 0;
+let CacheT1 = 0;
+let CacheOffset = 0;
+let WorkerBusy = false;
+let PositionsBuffer = null;
+let WorkerBuffer = null;
+let PositionsArray = null;
+const TempPos = new Cartesian3();
 
 async function Init() {
 	// Get the list of images
@@ -128,7 +138,8 @@ async function Init() {
 		type: "Init",
 		data: SatrecMap
 	});
-	PositionsBuffer = new ArrayBuffer(DetailMap.size * 4 * 8);
+	PositionsBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
+	WorkerBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
 
 	await window.Search();
 
@@ -139,14 +150,27 @@ async function Init() {
 }
 
 function TickUpdate(scene, time) {
-	if (viewer.clockViewModel.shouldAnimate && !WorkerBusy) {
+	const CurrTime = JulianDate.toDate(time).getTime();
+
+	// Run interpolation
+	const blend = (CurrTime - CacheT0) / CacheDuration;
+	for (let i = 0; i < CacheOffset; i += 7) {
+		const pt = PointsMap.get(PositionsArray[i]);
+		TempPos.x = PositionsArray[i+1] + (blend * (PositionsArray[i+4] - PositionsArray[i+1]));
+		TempPos.y = PositionsArray[i+2] + (blend * (PositionsArray[i+5] - PositionsArray[i+2]));
+		TempPos.z = PositionsArray[i+3] + (blend * (PositionsArray[i+6] - PositionsArray[i+3]));
+		pt.position = TempPos;
+	}
+
+	if (!WorkerBusy && (CurrTime < CacheT0 || CurrTime > CacheT1 - SafetyBuffer)) {
 		WorkerBusy = true;
-		const DateStr = JulianDate.toDate(time).toISOString();
 		Worker.postMessage({
 			type: 'Compute',
-			date: DateStr,
-			buffer: PositionsBuffer
-		}, [PositionsBuffer]);
+			T0: CurrTime,
+			T1: CurrTime + CacheDuration,
+			buffer: WorkerBuffer
+		}, [WorkerBuffer]);
+		WorkerBuffer = null;
 	}
 
 	if (MousePosition) {
@@ -215,15 +239,12 @@ function GetSatImage(Name) {
 Worker.onmessage = function(res) {
 	const inp = res.data;
 	if (inp.type == 'PositionResult') {
+		WorkerBuffer = PositionsBuffer
 		PositionsBuffer = inp.buffer;
-		const data = new Float64Array(PositionsBuffer);
-
-		for (let i = 0; i < inp.offset; i += 4) {
-			const id = data[i];
-			const pt = PointsMap.get(id);
-			//if (!pt) continue;
-			pt.position = Cartesian3.fromRadians(data[i+1], data[i+2], data[i+3]);
-		}
+		CacheT0 = inp.T0;
+		CacheT1 = inp.T1;
+		CacheOffset = inp.offset;
+		PositionsArray = new Float64Array(PositionsBuffer);
 	}
 	WorkerBusy = false;
 }
@@ -266,26 +287,11 @@ window.Search = async function (){
 		const NameB = DetailMap.get(B).name;
 		return NameA.localeCompare(NameB);
 	});
-	Worker.postMessage({
-		type: 'ActiveIds',
-		data: ActiveIds
-	});
 
 	// Display the results in the sidebar
 	PageIndex = 0;
 	RenderPage();
 	document.getElementById("SearchSubmit").textContent = "Search";
-
-	// Update positions for scenario -> reshowing hidden satellites after time difference between the searches
-	if (!WorkerBusy) {
-		WorkerBusy = true;
-		const DateStr = JulianDate.toDate(viewer.clock.currentTime).toISOString();
-		Worker.postMessage({
-			type: 'Compute',
-			date: DateStr,
-			buffer: PositionsBuffer
-		}, [PositionsBuffer]);
-	}
 }
 
 window.SatClicked = async function (SatId) {
