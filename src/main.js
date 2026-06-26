@@ -1,5 +1,6 @@
 import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer, Check } from 'cesium';
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
+import SatWorker from '/helpers/SatWorker.js?worker';
 
 Ion.defaultAccessToken = import.meta.env.VITE_token;
 const viewer = new Viewer('cesiumContainer', {
@@ -29,9 +30,12 @@ viewer.scene.atmosphere.show = false;
 viewer.scene.fog.enabled = false;
 
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-const SatEntries = new Map();
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const Orbits = viewer.scene.primitives.add(new PolylineCollection());
+const SatEntries = new Map();
+const Worker = new SatWorker();
+let WorkerBusy = false;
+let PositionsBuffer = null;
 let ImageNames = [];
 let Countries = {}
 let Sites = {}
@@ -55,10 +59,10 @@ async function Init() {
 	const ImageReq = await fetch('/Satellites/ImageNames.json');
 	ImageNames = await ImageReq.json();
 
-	const Request = await fetch('/api/FetchCountries');
-	const Response = await Request.json();
-	Countries = Response.Countries;
-	Sites = Response.Sites;
+	const CountryReq = await fetch('/api/FetchCountries');
+	const CountryRes = await CountryReq.json();
+	Countries = CountryRes.Countries;
+	Sites = CountryRes.Sites;
 
 	const SortedCountries = Object.entries(Countries).sort((a, b) => a[0].localeCompare(b[0]));
 	Countries = Object.fromEntries(SortedCountries);
@@ -85,11 +89,12 @@ async function Init() {
 	window.UpdateCountrySelection();
 
 	console.log('Fetching initial data');
-	const req = await fetch('/api/FetchInitial');
-	const results = await req.json();
+	const CatalogReq = await fetch('/api/FetchInitial');
+	const CatalogRes = await CatalogReq.json();
 
 	console.log('Initializing satellites');
-	results.forEach(sat => {
+	const SatrecMap = new Map();
+	CatalogRes.forEach(sat => {
 		const SatRec = twoline2satrec(sat.tle_line1, sat.tle_line2);
 		const Point = Points.add({
 			position: Cartesian3.ZERO,
@@ -100,49 +105,30 @@ async function Init() {
 		});
 		const Details = sat;
 		SatEntries.set(sat.norad_id, {Point, SatRec, Details});
+		SatrecMap.set(sat.norad_id, SatRec);
 	});
+	Worker.postMessage({
+		type: "Init",
+		data: SatrecMap
+	});
+	PositionsBuffer = new ArrayBuffer(SatEntries.size * 4 * 8);
 
-	window.Search();
+	await window.Search();
 
-	console.log('Tracking');
-	TrackingLoop();
+	viewer.scene.preUpdate.addEventListener((scene, time) => {
+		if (!viewer.clockViewModel.shouldAnimate || WorkerBusy) return;
+		WorkerBusy = true;
+		const DateStr = JulianDate.toDate(time).toISOString();
+		Worker.postMessage({
+			type: 'Compute',
+			date: DateStr,
+			ids: ActiveIds,
+			buffer: PositionsBuffer
+		}, [PositionsBuffer]);
+	});
 
 	document.getElementById('LoadingOverlay').remove();
 }
-
-function TrackingLoop(){
-	viewer.scene.preUpdate.addEventListener((scene, time) => {
-		if (!viewer.clockViewModel.shouldAnimate) return;
-		const Julian = JulianDate.toDate(time);
-		const gmst = gstime(Julian);
-
-		for (const sat of SatEntries.values()){
-			if (!sat.Point.show) continue;
-
-			const PV = propagate(sat.SatRec, Julian);
-			if (!PV || !PV.position) continue;
-			const PosEci = PV.position;
-			if (PosEci){
-				const Geodetic = eciToGeodetic(PosEci, gmst);
-				sat.Point.position = Cartesian3.fromRadians(
-					Geodetic.longitude,
-					Geodetic.latitude, 
-					Geodetic.height * 1000
-				);
-			}
-		}
-	});
-}
-
-handler.setInputAction(function (event) {
-	const obj = viewer.scene.pick(event.position);
-	if (obj && obj.primitive && obj.primitive.id) {
-		SatClicked(obj.primitive.id);
-	}
-	else {
-		ResetTrack();
-	}
-}, ScreenSpaceEventType.LEFT_CLICK);
 
 function RenderPage(){
 	var SatList = document.getElementById("SearchScroll");
@@ -164,7 +150,7 @@ function RenderPage(){
 				<div class="DetailsLine">
 					<span class="Norad">NORAD: ${sat.Details.norad_id}</span>
 					<span class="Site">INTL: ${sat.Details.intl_designator}</span>
-				</div>
+					</div>
 			</div>
 		`;
 		tab.onclick = () => SatClicked(ActiveIds[i]);
@@ -181,6 +167,22 @@ function GetSatImage(Name) {
 	Name = Name.toUpperCase();
 	const match = ImageNames.find(exp => Name.includes(exp));
 	return match ? `/Satellites/${match}.png` : '/Satellites/GENERIC.png';
+}
+
+Worker.onmessage = function(res) {
+	const inp = res.data;
+	if (inp.type == 'PositionResult') {
+		PositionsBuffer = inp.buffer;
+		const data = new Float64Array(PositionsBuffer);
+
+		for (let i = 0; i < inp.offset; i += 4) {
+			const id = data[i];
+			const sat = SatEntries.get(id);
+			if (!sat || sat == null || !sat.Point) continue;
+			sat.Point.position = Cartesian3.fromRadians(data[i+1], data[i+2], data[i+3]);
+		}
+	}
+	WorkerBusy = false;
 }
 
 window.Search = async function (){
@@ -203,12 +205,12 @@ window.Search = async function (){
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify({filters: filter})
 	});
-	if (!resp.ok) {
-		return;
-	}
 
 	var IDs = await resp.json();
 	IDs = new Set(IDs);
+	for (const [id, sat] of SatEntries.entries()) {
+		sat.Point.show = IDs.has(id);
+	}
 	ActiveIds = Array.from(IDs);
 	ActiveIds.sort((A, B) => {
 		const NameA = SatEntries.get(A).Details.name;
@@ -216,28 +218,20 @@ window.Search = async function (){
 		return NameA.localeCompare(NameB);
 	});
 
-	const Julian = JulianDate.toDate(viewer.clock.currentTime);
-	const gmst = gstime(Julian);
-	
-	for (const [id, sat] of SatEntries.entries()) {
-		sat.Point.show = IDs.has(id);
-		if (!sat.Point.show) continue;
-
-		const PV = propagate(sat.SatRec, Julian);
-		if (!PV || !PV.position) continue;
-		const PosEci = PV.position;
-		if (PosEci){
-			const Geodetic = eciToGeodetic(PosEci, gmst);
-			sat.Point.position = Cartesian3.fromRadians(
-				Geodetic.longitude,
-				Geodetic.latitude, 
-				Geodetic.height * 1000
-			);
-		}
-	}
 
 	PageIndex = 0;
 	RenderPage();
+
+	if (!WorkerBusy) {
+		WorkerBusy = true;
+		const DateStr = JulianDate.toDate(viewer.clock.currentTime).toISOString();
+		Worker.postMessage({
+			type: 'Compute',
+			date: DateStr,
+			ids: ActiveIds,
+			buffer: PositionsBuffer
+		}, [PositionsBuffer]);
+	}
 }
 
 window.SatClicked = async function (SatId) {
@@ -249,15 +243,12 @@ window.SatClicked = async function (SatId) {
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify({id: SatId})
 	});
-	if (!resp.ok) {
-		return;
-	}
 	var details = await resp.json();
-
+	
 	const Sidebar = document.getElementById('RightSidebar');
 	Sidebar.classList.add("open");
 	setTimeout(() => viewer.resize(), 400);
-
+	
 	document.getElementById("SatImg").src = GetSatImage(details.name);
 	document.getElementById("SatName").textContent = details.name;
 	document.getElementById("DetailNorad").textContent = details.norad_id;
@@ -270,7 +261,7 @@ window.SatClicked = async function (SatId) {
 	document.getElementById("DetailInclination").textContent = details.inclination;
 	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
 	document.getElementById("DetailPeriod").textContent = details.period;
-
+	
 	const sat = SatEntries.get(SatId);
 	TrackingId = SatId;
 	viewer.trackedEntity = TrackingEntity;
@@ -330,7 +321,7 @@ window.ResetTrack = function() {
 
 	TrackingId = null;
 	viewer.trackedEntity = undefined;
-
+	
 	if (OrbitLine != null) {
 		Orbits.remove(OrbitLine);
 		OrbitLine = null;
@@ -357,11 +348,11 @@ window.PageTurn = function(Next) {
 
 window.UpdateCountrySelection = function(){
 	const Selected = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
-
+	
 	let count = Selected.length;
 	if (document.getElementById('CountrySelectAll').checked) count -= 1;
 	document.getElementById("CountryMultiselectLabel").textContent = count + ' selected';
-
+	
 	let LaunchSites = new Set();
 	Selected.forEach((cb) => {
 		if (cb.value == 'All') return;
@@ -371,12 +362,12 @@ window.UpdateCountrySelection = function(){
 	LaunchSites = Array.from(LaunchSites).sort();
 	const SiteOptions = document.getElementById('SiteOptions');
 	SiteOptions.innerHTML = '';
-
+	
 	const SelectAll = document.createElement('label');
 	SelectAll.className = 'MultiselectItem';
 	SelectAll.innerHTML = `
-		<input type="checkbox" value="All" id="SiteSelectAll" checked onchange="SiteSelectAll()">
-		<span>Select All</span>
+	<input type="checkbox" value="All" id="SiteSelectAll" checked onchange="SiteSelectAll()">
+	<span>Select All</span>
 	`;
 	SiteOptions.append(SelectAll);
 	
@@ -386,7 +377,7 @@ window.UpdateCountrySelection = function(){
 		label.innerHTML = `
             <input type="checkbox" value="${Site}" checked onchange="UpdateSiteSelection()">
             <span>${Site}</span>
-        `;
+			`;
 		SiteOptions.append(label);
 	}
 	UpdateSiteSelection();
@@ -420,12 +411,22 @@ window.SiteSelectAll = function(){
 }
 
 document.addEventListener('click', function(e) {
-    const Country = document.getElementById('CountrySelectContainer');
+	const Country = document.getElementById('CountrySelectContainer');
 	const Site = document.getElementById('SiteSelectContainer');
     if (!Country.contains(e.target))
         document.getElementById('CountryOptions').classList.remove('open');
     if (!Site.contains(e.target))
         document.getElementById('SiteOptions').classList.remove('open');
 });
+
+handler.setInputAction(function (event) {
+	const obj = viewer.scene.pick(event.position);
+	if (obj && obj.primitive && obj.primitive.id) {
+		SatClicked(obj.primitive.id);
+	}
+	else {
+		ResetTrack();
+	}
+}, ScreenSpaceEventType.LEFT_CLICK);
 
 Init();
