@@ -53,7 +53,7 @@ html, body {
     width: 300px;
     padding: 30px;
     border-radius: 12px;
-    background-color: rgb(100, 100, 100);
+    background-color: var(--BackgroundRaised);
     color: var(--TextPrimary);
     box-shadow: var(--ShadowCardAmbient), 0 0 20px hsla(195, 100%, 45%, 0.1);
     border: 1px solid var(--BorderBright);

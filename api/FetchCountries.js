@@ -1,5 +1,3 @@
-import { put } from '@vercel/blob';
-
 const COUNTRY_URL = "https://oak9imuykyhibxko.private.blob.vercel-storage.com/Countries.json";
 const SITE_URL = "https://oak9imuykyhibxko.private.blob.vercel-storage.com/Sites.json"
 

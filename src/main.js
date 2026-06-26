@@ -35,12 +35,14 @@ const PageLength = 50;
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const Orbits = viewer.scene.primitives.add(new PolylineCollection());
-const SatEntries = new Map();
+const PointsMap = new Map();
+const SatrecMap = new Map();
+const DetailMap = new Map();
 const Worker = new SatWorker();
 const TrackingEntity = viewer.entities.add({
 	id: "Tracker",
 	position: new CallbackProperty((time, res) => {
-		if (TrackingId) return SatEntries.get(TrackingId).Point.position;
+		if (TrackingId) return PointsMap.get(TrackingId).position;
 		return undefined;
 	}, false),
 	viewFrom: new Cartesian3(0, -500000, 500000),
@@ -109,7 +111,6 @@ async function Init() {
 
 	// Initialize the local catalog
 	console.log('Initializing satellites');
-	const SatrecMap = new Map();
 	CatalogRes.forEach(sat => {
 		const SatRec = twoline2satrec(sat.tle_line1, sat.tle_line2);
 		const Point = Points.add({
@@ -119,15 +120,15 @@ async function Init() {
 			scaleByDistance: new NearFarScalar(1.0e5, 1.0, 2.0e7, 0.2),
 			id: sat.norad_id
 		});
-		const Details = sat;
-		SatEntries.set(sat.norad_id, {Point, SatRec, Details});
+		PointsMap.set(sat.norad_id, Point);
 		SatrecMap.set(sat.norad_id, SatRec);
+		DetailMap.set(sat.norad_id, sat);
 	});
 	Worker.postMessage({
 		type: "Init",
 		data: SatrecMap
 	});
-	PositionsBuffer = new ArrayBuffer(SatEntries.size * 4 * 8);
+	PositionsBuffer = new ArrayBuffer(DetailMap.size * 4 * 8);
 
 	await window.Search();
 
@@ -144,7 +145,6 @@ function TickUpdate(scene, time) {
 		Worker.postMessage({
 			type: 'Compute',
 			date: DateStr,
-			ids: ActiveIds,
 			buffer: PositionsBuffer
 		}, [PositionsBuffer]);
 	}
@@ -177,21 +177,21 @@ function RenderPage(){
 
 	// Adds sat card for each active id
 	for (let i = PageIndex * PageLength; i < ActiveIds.length && i < (PageIndex + 1) * PageLength; ++i){
-		const sat = SatEntries.get(ActiveIds[i])
+		const detail = DetailMap.get(ActiveIds[i])
 
 		const tab = document.createElement('div');
 		tab.className = "SatCard";
 		tab.innerHTML = `
-			<img src="${GetSatImage(sat.Details.name)}" alt="Satellite">
+			<img src="${GetSatImage(detail.name)}" alt="Satellite">
 			<div class="SatCardDetails">
-				<span class="SatName">${sat.Details.name}</span>
+				<span class="SatName">${detail.name}</span>
 				<div class="DetailsLine">
-					<span class="Country">Country: ${sat.Details.country}</span>
-					<span class="Site">Site: ${sat.Details.launch_site}</span>
+					<span class="Country">Country: ${detail.country}</span>
+					<span class="Site">Site: ${detail.launch_site}</span>
 				</div>
 				<div class="DetailsLine">
-					<span class="Norad">NORAD: ${sat.Details.norad_id}</span>
-					<span class="Site">INTL: ${sat.Details.intl_designator}</span>
+					<span class="Norad">NORAD: ${detail.norad_id}</span>
+					<span class="Site">INTL: ${detail.intl_designator}</span>
 					</div>
 			</div>
 		`;
@@ -220,9 +220,9 @@ Worker.onmessage = function(res) {
 
 		for (let i = 0; i < inp.offset; i += 4) {
 			const id = data[i];
-			const sat = SatEntries.get(id);
-			if (!sat || sat == null || !sat.Point) continue;
-			sat.Point.position = Cartesian3.fromRadians(data[i+1], data[i+2], data[i+3]);
+			const pt = PointsMap.get(id);
+			//if (!pt) continue;
+			pt.position = Cartesian3.fromRadians(data[i+1], data[i+2], data[i+3]);
 		}
 	}
 	WorkerBusy = false;
@@ -232,41 +232,43 @@ window.Search = async function (){
 	document.getElementById("SearchSubmit").textContent = "Searching...";
 
 	// Initialize all filters
-	let Name = document.getElementById("NameSearch").value;
+	let Name = document.getElementById("NameSearch").value.trim().toUpperCase();
 	let FromDate = document.getElementById("LaunchDateFrom").valueAsDate;
 	let ToDate = document.getElementById("LaunchDateTo").valueAsDate;
 	let ElementCountries = document.querySelectorAll('#CountryOptions input[type="checkbox"]:checked');
 	let ElementSites = document.querySelectorAll('#SiteOptions input[type="checkbox"]:checked');
-	let SelectedCountries = ['bugfix'];
-	let SelectedSites = ['bugfix'];
+	let SelectedCountries = new Set();
+	let SelectedSites = new Set();
 
-	// Fill in filters and defaults
-	if (!FromDate) FromDate = new Date(1900, 0, 0);
+	if (!FromDate) FromDate = new Date(1900, 0, 1);
 	if (!ToDate) ToDate = new Date();
-	ElementCountries.forEach((cb) => { SelectedCountries.push(cb.value); });
-	ElementSites.forEach((cb) => { SelectedSites.push(cb.value); });
+	ElementCountries.forEach((cb) => { SelectedCountries.add(cb.value); });
+	ElementSites.forEach((cb) => { SelectedSites.add(cb.value); });
 
-	// Send request
-	let filter = {Name: Name, Country: SelectedCountries, Site: SelectedSites, Date: [FromDate, ToDate]};
-	const resp = await fetch('/api/FetchCatalog', {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({filters: filter})
-	});
+	// Run filter
+	ActiveIds = [];
+	for (const [id, detail] of DetailMap.entries()) {
+		PointsMap.get(id).show = false;
 
-	// Show/hide satellites
-	var IDs = await resp.json();
-	IDs = new Set(IDs);
-	for (const [id, sat] of SatEntries.entries()) {
-		sat.Point.show = IDs.has(id);
+		if (!detail.name.toUpperCase().includes(Name)) continue;
+		if (!SelectedCountries.has(detail.country)) continue;
+		if (!SelectedSites.has(detail.launch_site)) continue;
+		if (FromDate > new Date(detail.launch_date)) continue;
+		if (ToDate < new Date(detail.launch_date)) continue;
+
+		ActiveIds.push(id);
+		PointsMap.get(id).show = true;
 	}
 
-	// Sort all ids alphabetically
-	ActiveIds = Array.from(IDs);
+	// Sort ids alphabetically
 	ActiveIds.sort((A, B) => {
-		const NameA = SatEntries.get(A).Details.name;
-		const NameB = SatEntries.get(B).Details.name;
+		const NameA = DetailMap.get(A).name;
+		const NameB = DetailMap.get(B).name;
 		return NameA.localeCompare(NameB);
+	});
+	Worker.postMessage({
+		type: 'ActiveIds',
+		data: ActiveIds
 	});
 
 	// Display the results in the sidebar
@@ -281,7 +283,6 @@ window.Search = async function (){
 		Worker.postMessage({
 			type: 'Compute',
 			date: DateStr,
-			ids: ActiveIds,
 			buffer: PositionsBuffer
 		}, [PositionsBuffer]);
 	}
@@ -291,55 +292,45 @@ window.SatClicked = async function (SatId) {
 	// Deselect
 	window.ResetTrack();
 	document.getElementById("SatName").textContent = "Loading...";
-
-	// Get data
-	const resp = await fetch('/api/FetchDetails', {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({id: SatId})
-	});
-	var details = await resp.json();
 	
 	// Open sidebar
 	const Sidebar = document.getElementById('RightSidebar');
 	Sidebar.classList.add("open");
-	setTimeout(() => viewer.resize(), 400);
 	
 	// Set all values
-	document.getElementById("SatImg").src = GetSatImage(details.name);
-	document.getElementById("SatName").textContent = details.name;
-	document.getElementById("DetailNorad").textContent = details.norad_id;
-	document.getElementById("DetailIntl").textContent = details.intl_designator;
-	document.getElementById("DetailDate").textContent = details.launch_date.split('T')[0];
-	document.getElementById("DetailCountry").textContent = details.country;
-	document.getElementById("DetailSite").textContent = details.launch_site;
-	document.getElementById("DetailApoapsis").textContent = details.apoapsis;
-	document.getElementById("DetailPeriapsis").textContent = details.periapsis;
-	document.getElementById("DetailInclination").textContent = details.inclination;
-	document.getElementById("DetailEccentricity").textContent = details.eccentricity;
-	document.getElementById("DetailPeriod").textContent = details.period;
+	const Detail = DetailMap.get(SatId);
+	document.getElementById("SatImg").src = GetSatImage(Detail.name);
+	document.getElementById("SatName").textContent = Detail.name;
+	document.getElementById("DetailNorad").textContent = Detail.norad_id;
+	document.getElementById("DetailIntl").textContent = Detail.intl_designator;
+	document.getElementById("DetailDate").textContent = Detail.launch_date.split('T')[0];
+	document.getElementById("DetailCountry").textContent = Detail.country;
+	document.getElementById("DetailSite").textContent = Detail.launch_site;
+	document.getElementById("DetailApoapsis").textContent = Detail.apoapsis;
+	document.getElementById("DetailPeriapsis").textContent = Detail.periapsis;
+	document.getElementById("DetailInclination").textContent = Detail.inclination;
+	document.getElementById("DetailEccentricity").textContent = Detail.eccentricity;
+	document.getElementById("DetailPeriod").textContent = Detail.period;
 	
 	// Set tracker and smoothly fly there
-	const sat = SatEntries.get(SatId);
 	TrackingId = SatId;
 	viewer.trackedEntity = TrackingEntity;
 	viewer.camera.flyToBoundingSphere(
-		new BoundingSphere(sat.Point.position, 500000),
+		new BoundingSphere(PointsMap.get(SatId).position, 500000),
 		{ duration: 1 }
 	);
 
 	// Compute orbital trajectory
 	const positions = [];
-	const mins = details.period;
+	const mins = Detail.period;
 	const samples = 50 * 2;
 	const step = mins / samples / 2;
-	const satrec = sat.satrec;
 
 	for(let i = -samples; i <= samples; ++i) {
 		const offset = i * step;
 		const Time = new Date(JulianDate.toDate(viewer.clock.currentTime).getTime() + (offset * 60 * 1000));
 
-		const PV = propagate(sat.SatRec, Time);
+		const PV = propagate(SatrecMap.get(SatId), Time);
 		if (!PV || !PV.position) continue;
 		const PosEci = PV.position;
 		if (PosEci){
@@ -403,7 +394,7 @@ window.UpdateCountrySelection = function(){
 		document.getElementById("CountryMultiselectLabel").textContent = "All Selected";
 	}
 	else {
-		document.getElementById('CountrySelectAll').checked = true;
+		document.getElementById('CountrySelectAll').checked = false;
 		document.getElementById("CountryMultiselectLabel").textContent = count + ' selected';
 	}
 
@@ -413,6 +404,7 @@ window.UpdateCountrySelection = function(){
 		if (cb.value == 'All') return;
 		Sites[cb.value].forEach(Site => LaunchSites.add(Site));
 	});
+	LaunchSites = [...LaunchSites].sort();
 
 	// Populate launch site options
 	const SiteOptions = document.getElementById('SiteOptions');
@@ -454,7 +446,7 @@ window.UpdateSiteSelection = function() {
 		document.getElementById("SiteMultiselectLabel").textContent = "All Selected";
 	}
 	else {
-		document.getElementById('SiteSelectAll').checked = true;
+		document.getElementById('SiteSelectAll').checked = false;
 		document.getElementById("SiteMultiselectLabel").textContent = count + ' selected';
 	}
 }
@@ -509,7 +501,6 @@ handler.setInputAction(function (movement) { MousePosition = movement.endPositio
 window.ToggleSidebar = function(ID){
 	const Sidebar = document.getElementById(ID);
 	Sidebar.classList.toggle("open");
-	setTimeout(() => viewer.resize(), 400);
 }
 
 window.ToggleMultiselect = function(ID){

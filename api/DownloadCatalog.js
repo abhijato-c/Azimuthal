@@ -44,18 +44,9 @@ export default async function handler(req, res) {
                 apoapsis REAL,
                 periapsis REAL,
                 tle_line1 CHAR(69) NOT NULL,
-                tle_line2 CHAR(69) NOT NULL,
-                epoch TIMESTAMP WITH TIME ZONE
+                tle_line2 CHAR(69) NOT NULL
             );
         `;
-
-        // Filtering indexes
-        console.log('Creating indexes');
-        await sql`CREATE INDEX IF NOT EXISTS idx_satellites_name ON satellites (name);`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_satellites_country ON satellites (country);`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_satellites_intl_designator ON satellites (intl_designator);`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_satellites_launch_date ON satellites (launch_date);`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_satellites_launch_site ON satellites (launch_site);`;
 
         // Refine data
         console.log('Refining data and uploading');
@@ -70,7 +61,6 @@ export default async function handler(req, res) {
             const Countries = [];
             const LaunchDates = [];
             const LaunchSites = [];
-            const Epochs = [];
             const Inclinations = [];
             const Eccentricities = [];
             const Periods = [];
@@ -86,7 +76,6 @@ export default async function handler(req, res) {
                 Countries.push(sat.COUNTRY_CODE || null);
                 LaunchSites.push(sat.SITE || null);
                 LaunchDates.push(sat.LAUNCH_DATE ? sat.LAUNCH_DATE : null);
-                Epochs.push(sat.EPOCH ? new Date(sat.EPOCH + 'Z').toISOString() : null);
                 
                 Inclinations.push(parseFloat(sat.INCLINATION) || 0.0);
                 Eccentricities.push(parseFloat(sat.ECCENTRICITY) || 0.0);
@@ -101,7 +90,7 @@ export default async function handler(req, res) {
             await sql`
                 INSERT INTO satellites (
                     norad_id, name, intl_designator, country, launch_date, launch_site,
-                    inclination, eccentricity, period, apoapsis, periapsis, tle_line1, tle_line2, epoch
+                    inclination, eccentricity, period, apoapsis, periapsis, tle_line1, tle_line2
                 )
                 SELECT * FROM UNNEST(
                     ${NoradIds}::INT[], 
@@ -116,8 +105,7 @@ export default async function handler(req, res) {
                     ${ApoapsisVals}::REAL[], 
                     ${PeriapsisVals}::REAL[], 
                     ${Tle1s}::CHAR(69)[], 
-                    ${Tle2s}::CHAR(69)[],
-                    ${Epochs}::TIMESTAMP WITH TIME ZONE[]
+                    ${Tle2s}::CHAR(69)[]
                 )
                 ON CONFLICT (norad_id) DO UPDATE SET
                     name = EXCLUDED.name,
@@ -131,8 +119,7 @@ export default async function handler(req, res) {
                     apoapsis = EXCLUDED.apoapsis,
                     periapsis = EXCLUDED.periapsis,
                     tle_line1 = EXCLUDED.tle_line1,
-                    tle_line2 = EXCLUDED.tle_line2,
-                    epoch = EXCLUDED.epoch;
+                    tle_line2 = EXCLUDED.tle_line2;
             `;
         }
 
