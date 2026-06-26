@@ -14,7 +14,8 @@ self.onmessage = function (req) {
         let offset = 0;
         for (const id of Ids) {
             const PV = propagate(SatrecMap.get(id), CurrTime);
-            if (!PV || !PV.position) continue;
+            if (!PV) continue;
+            
             const Geodetic = eciToGeodetic(PV.position, gmst);
             Positions[offset] = id;
             Positions[offset + 1] = Geodetic.longitude;

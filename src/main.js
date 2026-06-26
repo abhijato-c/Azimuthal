@@ -1,4 +1,4 @@
-import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer, Check } from 'cesium';
+import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer } from 'cesium';
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 import SatWorker from '/helpers/SatWorker.js?worker';
 
@@ -16,11 +16,11 @@ const viewer = new Viewer('cesiumContainer', {
 	navigationHelpButton: false,
 	geocoder: false,
 	fullscreenButton: false,
-	shouldAnimate: false,
 	projectionPicker: false,
 	sceneModePicker: false,
 	requestRenderMode: false,
 	skyAtmosphere: false,
+	shouldAnimate: true,
 	scene3DOnly: true,
 });
 viewer.resolutionScale = window.devicePixelRatio;
@@ -30,22 +30,14 @@ viewer.scene.globe.enableLighting = false;
 viewer.scene.atmosphere.show = false;
 viewer.scene.fog.enabled = false;
 
+const ClickAOE = 3;
+const PageLength = 50;
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const Orbits = viewer.scene.primitives.add(new PolylineCollection());
 const SatEntries = new Map();
 const Worker = new SatWorker();
-let WorkerBusy = false;
-let PositionsBuffer = null;
-let ImageNames = [];
-let Countries = {}
-let Sites = {}
-let PageIndex = 0;
-let PageLength = 50;
-let ActiveIds = null;
-let OrbitLine = null;
-let TrackingId = null;
-let TrackingEntity = viewer.entities.add({
+const TrackingEntity = viewer.entities.add({
 	id: "Tracker",
 	position: new CallbackProperty((time, res) => {
 		if (TrackingId) return SatEntries.get(TrackingId).Point.position;
@@ -54,7 +46,26 @@ let TrackingEntity = viewer.entities.add({
 	viewFrom: new Cartesian3(0, -500000, 500000),
 	point: { pixelSize: 0 }
 });
+const HoverHighlight = Points.add({
+	position: Cartesian3.ZERO,
+	color: Color.TRANSPARENT,
+	outlineColor: Color.LIME,
+	outlineWidth: 2,
+	pixelSize: 20,
+	show: false,
+	id: "HoverHighlight"
+});
 
+let WorkerBusy = false;
+let PositionsBuffer = null;
+let ImageNames = [];
+let Countries = {};
+let Sites = {};
+let PageIndex = 0;
+let ActiveIds = null;
+let OrbitLine = null;
+let TrackingId = null;
+let MousePosition = null;
 
 async function Init() {
 	// Get the list of images
@@ -121,8 +132,13 @@ async function Init() {
 	await window.Search();
 
 	// Fires a request to update positions each tick
-	viewer.scene.preUpdate.addEventListener((scene, time) => {
-		if (!viewer.clockViewModel.shouldAnimate || WorkerBusy) return;
+	viewer.scene.preUpdate.addEventListener(TickUpdate);
+
+	document.getElementById('LoadingOverlay').remove();
+}
+
+function TickUpdate(scene, time) {
+	if (viewer.clockViewModel.shouldAnimate && !WorkerBusy) {
 		WorkerBusy = true;
 		const DateStr = JulianDate.toDate(time).toISOString();
 		Worker.postMessage({
@@ -131,9 +147,28 @@ async function Init() {
 			ids: ActiveIds,
 			buffer: PositionsBuffer
 		}, [PositionsBuffer]);
-	});
+	}
 
-	document.getElementById('LoadingOverlay').remove();
+	if (MousePosition) {
+		const HoveredObjects = viewer.scene.drillPick(
+			MousePosition,
+			3,
+			ClickAOE,
+			ClickAOE
+		);
+
+		for (const sat of HoveredObjects) {
+			if (sat.primitive && sat.primitive.id && sat.primitive.id != "HoverHighlight" && sat.primitive.show) {
+				HoverHighlight.position = sat.primitive.position;
+				HoverHighlight.show = true;
+				viewer.canvas.style.cursor = 'pointer';
+				return;
+			}
+		}
+
+		HoverHighlight.show = false;
+		viewer.canvas.style.cursor = 'default';
+	}
 }
 
 function RenderPage(){
@@ -194,6 +229,8 @@ Worker.onmessage = function(res) {
 }
 
 window.Search = async function (){
+	document.getElementById("SearchSubmit").textContent = "Searching...";
+
 	// Initialize all filters
 	let Name = document.getElementById("NameSearch").value;
 	let FromDate = document.getElementById("LaunchDateFrom").valueAsDate;
@@ -235,6 +272,7 @@ window.Search = async function (){
 	// Display the results in the sidebar
 	PageIndex = 0;
 	RenderPage();
+	document.getElementById("SearchSubmit").textContent = "Search";
 
 	// Update positions for scenario -> reshowing hidden satellites after time difference between the searches
 	if (!WorkerBusy) {
@@ -449,14 +487,24 @@ document.addEventListener('click', function(e) {
 
 // Track or untrack sat on viewport click
 handler.setInputAction(function (event) {
-	const obj = viewer.scene.pick(event.position);
-	if (obj && obj.primitive && obj.primitive.id) {
-		SatClicked(obj.primitive.id);
+	const ClickedObjects = viewer.scene.drillPick(
+		event.position,
+		3,
+		ClickAOE,
+		ClickAOE
+	);
+
+	for (const sat of ClickedObjects) {
+		if (sat.primitive && sat.primitive.id && sat.primitive.id != "HoverHighlight" && sat.primitive.show) {
+			SatClicked(sat.primitive.id);
+			return;
+		}
 	}
-	else {
-		ResetTrack();
-	}
+	ResetTrack();
 }, ScreenSpaceEventType.LEFT_CLICK);
+
+// Show highlight
+handler.setInputAction(function (movement) { MousePosition = movement.endPosition; }, ScreenSpaceEventType.MOUSE_MOVE);
 
 window.ToggleSidebar = function(ID){
 	const Sidebar = document.getElementById(ID);

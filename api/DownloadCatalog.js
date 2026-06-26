@@ -6,7 +6,7 @@ export const config = {
     maxDuration: 300
 };
 
-const ChunkUrl = 'https://www.space-track.org/basicspacedata/query/class/gp/DECAY_DATE/null-val/OBJECT_TYPE/PAYLOAD/format/json';
+const ChunkUrl = 'https://www.space-track.org/basicspacedata/query/class/gp/epoch/%3Enow-14/DECAY_DATE/null-val/OBJECT_TYPE/PAYLOAD/format/json';
 
 export default async function handler(req, res) {
     // Ensure the request is from cron

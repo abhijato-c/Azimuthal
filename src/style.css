@@ -313,6 +313,10 @@ html, body {
     box-shadow: 0 4px 16px var(--AccentCyanGlow);
 }
 
+#SearchSubmit:active {
+    background: var(--AccentCyan);
+}
+
 #SearchScroll {
     display: flex;
     flex-direction: column;
