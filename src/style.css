@@ -116,7 +116,8 @@ html, body {
 .Sidebar {
     width: 0;
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
@@ -472,7 +473,7 @@ html, body {
 }
 
 .AccordionSection {
-    overflow: hidden;
+    overflow-y: visible;
     border-radius: 10px;
     margin-bottom: 8px;
     background-color: var(--BackgroundSunken);

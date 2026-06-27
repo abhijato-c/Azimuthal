@@ -1,9 +1,8 @@
-import { Viewer, Cartesian3, Color, Ion, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, Polyline, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer } from 'cesium';
+import { Viewer, Cartesian3, Color, JulianDate, PointPrimitiveCollection, ScreenSpaceEventHandler, ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, PolylineCollection, Material, UrlTemplateImageryProvider, ImageryLayer } from 'cesium';
 import { twoline2satrec, gstime, eciToGeodetic, propagate } from 'satellite.js';
 import SatWorker from '/helpers/SatWorker.js?worker';
 
 // Setup viewport and variables
-Ion.defaultAccessToken = import.meta.env.VITE_token;
 const viewer = new Viewer('cesiumContainer', {
 	baseLayer: new ImageryLayer(new UrlTemplateImageryProvider({
 		url: `https://api.maptiler.com/maps/hybrid-v4/{z}/{x}/{y}.jpg?key=${import.meta.env.VITE_MAPTILER_KEY}`
@@ -34,7 +33,6 @@ const ClickAOE = 3;
 const PageLength = 50;
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
-const Orbits = viewer.scene.primitives.add(new PolylineCollection());
 const PointsMap = new Map();
 const SatrecMap = new Map();
 const DetailMap = new Map();
@@ -63,9 +61,10 @@ let Countries = {};
 let Sites = {};
 let PageIndex = 0;
 let ActiveIds = null;
-let OrbitLine = null;
 let TrackingId = null;
 let MousePosition = null;
+let LastUpdate = 0;
+let UpdateInterval = 100;
 
 // Position interpolation
 const CacheDuration = 30000;
@@ -78,6 +77,16 @@ let PositionsBuffer = null;
 let WorkerBuffer = null;
 let PositionsArray = null;
 const TempPos = new Cartesian3();
+
+// Orbit Lines
+const Orbits = viewer.scene.primitives.add(new PolylineCollection());
+const OrbitLine = Orbits.add({
+	width: 3,
+	material: Material.fromType("Color", { color: Color.RED })
+});
+const OrbitalSamples = 100;
+let OrbitalBuffer = null;
+let OrbitBusy = false;
 
 async function Init() {
 	// Get the list of images
@@ -140,6 +149,7 @@ async function Init() {
 	});
 	PositionsBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
 	WorkerBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
+	OrbitalBuffer = new ArrayBuffer((OrbitalSamples * 2 + 1) * 3 * 8);
 
 	await window.Search();
 
@@ -162,6 +172,9 @@ function TickUpdate(scene, time) {
 		pt.position = TempPos;
 	}
 
+	if (CurrTime < LastUpdate + UpdateInterval) return;
+	LastUpdate = CurrTime;
+
 	if (!WorkerBusy && (CurrTime < CacheT0 || CurrTime > CacheT1 - SafetyBuffer)) {
 		WorkerBusy = true;
 		Worker.postMessage({
@@ -171,6 +184,24 @@ function TickUpdate(scene, time) {
 			buffer: WorkerBuffer
 		}, [WorkerBuffer]);
 		WorkerBuffer = null;
+
+		if (TrackingId && !OrbitBusy) {
+			OrbitBusy = true;
+			Worker.postMessage({
+				type: 'CalcDetails',
+				id: TrackingId,
+				time: CurrTime
+			});
+			Worker.postMessage({
+				type: 'CalcOrbit',
+				buffer: OrbitalBuffer,
+				id: TrackingId,
+				time: CurrTime,
+				period: DetailMap.get(TrackingId).period,
+				samples: OrbitalSamples
+			}, [OrbitalBuffer]);
+			OrbitalBuffer = null;
+		}
 	}
 
 	if (MousePosition) {
@@ -245,8 +276,31 @@ Worker.onmessage = function(res) {
 		CacheT1 = inp.T1;
 		CacheOffset = inp.offset;
 		PositionsArray = new Float64Array(PositionsBuffer);
+		WorkerBusy = false;
 	}
-	WorkerBusy = false;
+	else if (inp.type == 'UpdateStats' && inp.id == TrackingId) {
+		document.getElementById("DetailSpeed").textContent = inp.speed + " km/h";
+		document.getElementById("DetailHeading").textContent = inp.heading + "°";
+		document.getElementById("DetailLatitude").textContent = inp.latitude + "°";
+		document.getElementById("DetailLongitude").textContent = inp.longitude + "°";
+		document.getElementById("DetailAltitude").textContent = inp.altitude + " km";
+	}
+	else if (inp.type == 'OrbitResult' && inp.id == TrackingId) {
+		OrbitalBuffer = inp.buffer;
+		const PosArray = new Float64Array(OrbitalBuffer);
+		const PosCart = [];
+		for (let i = 0; i < PosArray.length; i += 3) {
+			const cart = Cartesian3.fromRadians(
+				PosArray[i],
+				PosArray[i + 1], 
+				PosArray[i + 2]
+			);
+			PosCart.push(cart);
+		}
+		OrbitLine.positions = PosCart;
+		OrbitLine.show = true;
+		OrbitBusy = false;
+	}
 }
 
 window.Search = async function (){
@@ -280,6 +334,9 @@ window.Search = async function (){
 		ActiveIds.push(id);
 		PointsMap.get(id).show = true;
 	}
+
+	// Untrack if current satellite was filtered
+	if (TrackingId && !ActiveIds.includes(TrackingId)) ResetTrack();
 
 	// Sort ids alphabetically
 	ActiveIds.sort((A, B) => {
@@ -326,34 +383,22 @@ window.SatClicked = async function (SatId) {
 		{ duration: 1 }
 	);
 
-	// Compute orbital trajectory
-	const positions = [];
-	const mins = Detail.period;
-	const samples = 50 * 2;
-	const step = mins / samples / 2;
+	// Compute orbital trajectory and details
+	const time = JulianDate.toDate(viewer.clock.currentTime).getTime();
+	Worker.postMessage({
+		type: 'CalcOrbit',
+		buffer: OrbitalBuffer,
+		id: TrackingId,
+		time: time,
+		period: Detail.period,
+		samples: OrbitalSamples
+	}, [OrbitalBuffer]);
+	OrbitalBuffer = null;
 
-	for(let i = -samples; i <= samples; ++i) {
-		const offset = i * step;
-		const Time = new Date(JulianDate.toDate(viewer.clock.currentTime).getTime() + (offset * 60 * 1000));
-
-		const PV = propagate(SatrecMap.get(SatId), Time);
-		if (!PV || !PV.position) continue;
-		const PosEci = PV.position;
-		if (PosEci){
-			const gmst = gstime(Time);
-			const Geodetic = eciToGeodetic(PosEci, gmst);
-			const cart = Cartesian3.fromRadians(
-				Geodetic.longitude,
-				Geodetic.latitude, 
-				Geodetic.height * 1000
-			);
-			positions.push(cart);
-		}
-	}
-	OrbitLine = Orbits.add({
-		positions: positions,
-		width: 3,
-		material: Material.fromType("Color", { color: Color.RED })
+	Worker.postMessage({
+		type: 'CalcDetails',
+		id: TrackingId,
+		time: time
 	});
 }
 
@@ -371,15 +416,16 @@ window.ResetTrack = function() {
 	document.getElementById("DetailInclination").textContent = "";
 	document.getElementById("DetailEccentricity").textContent = "";
 	document.getElementById("DetailPeriod").textContent = "";
+	document.getElementById("DetailSpeed").textContent = "";
+	document.getElementById("DetailHeading").textContent = "";
+	document.getElementById("DetailAltitude").textContent = "";
+	document.getElementById("DetailLatitude").textContent = "";
+	document.getElementById("DetailLongitude").textContent = "";
 
 	// Reset tracking and orbit
 	TrackingId = null;
 	viewer.trackedEntity = undefined;
-	
-	if (OrbitLine != null) {
-		Orbits.remove(OrbitLine);
-		OrbitLine = null;
-	}
+	OrbitLine.show = false;
 }
 
 window.UpdateCountrySelection = function(){
