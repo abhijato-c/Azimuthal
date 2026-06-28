@@ -87,8 +87,8 @@ self.onmessage = function (req) {
         const mins = inp.period;
         const samples = inp.samples;
 
-        const step = mins / (samples * 2 + 1);
-        const Positions = new Float64Array(inp.buffer);
+        const step = mins / (samples * 2);
+        const Positions = new Float64Array((samples * 2 + 1) * 3);
     
         let ArrOffset = 0;
         for(let i = -samples; i <= samples; ++i) {

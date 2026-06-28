@@ -34,7 +34,6 @@ const PageLength = 50;
 const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const PointsMap = new Map();
-const SatrecMap = new Map();
 const DetailMap = new Map();
 const Worker = new SatWorker();
 const TrackingEntity = viewer.entities.add({
@@ -85,8 +84,6 @@ const OrbitLine = Orbits.add({
 	material: Material.fromType("Color", { color: Color.RED })
 });
 const OrbitalSamples = 100;
-let OrbitalBuffer = null;
-let OrbitBusy = false;
 
 async function Init() {
 	// Get the list of images
@@ -130,8 +127,9 @@ async function Init() {
 
 	// Initialize the local catalog
 	console.log('Initializing satellites');
+	const SatrecMap = new Map();
 	CatalogRes.forEach(sat => {
-		const SatRec = twoline2satrec(sat.tle_line1, sat.tle_line2);
+		SatrecMap.set(sat.norad_id, twoline2satrec(sat.tle_line1, sat.tle_line2));
 		const Point = Points.add({
 			position: Cartesian3.ZERO,
 			color: Color.fromCssColorString('#00a8ff').withAlpha(0.8),
@@ -140,7 +138,6 @@ async function Init() {
 			id: sat.norad_id
 		});
 		PointsMap.set(sat.norad_id, Point);
-		SatrecMap.set(sat.norad_id, SatRec);
 		DetailMap.set(sat.norad_id, sat);
 	});
 	Worker.postMessage({
@@ -149,13 +146,9 @@ async function Init() {
 	});
 	PositionsBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
 	WorkerBuffer = new ArrayBuffer(DetailMap.size * 7 * 8);
-	OrbitalBuffer = new ArrayBuffer((OrbitalSamples * 2 + 1) * 3 * 8);
 
 	await window.Search();
-
-	// Fires a request to update positions each tick
 	viewer.scene.preUpdate.addEventListener(TickUpdate);
-
 	document.getElementById('LoadingOverlay').remove();
 }
 
@@ -185,8 +178,7 @@ function TickUpdate(scene, time) {
 		}, [WorkerBuffer]);
 		WorkerBuffer = null;
 
-		if (TrackingId && !OrbitBusy) {
-			OrbitBusy = true;
+		if (TrackingId) {
 			Worker.postMessage({
 				type: 'CalcDetails',
 				id: TrackingId,
@@ -194,13 +186,11 @@ function TickUpdate(scene, time) {
 			});
 			Worker.postMessage({
 				type: 'CalcOrbit',
-				buffer: OrbitalBuffer,
 				id: TrackingId,
 				time: CurrTime,
 				period: DetailMap.get(TrackingId).period,
 				samples: OrbitalSamples
-			}, [OrbitalBuffer]);
-			OrbitalBuffer = null;
+			});
 		}
 	}
 
@@ -286,8 +276,7 @@ Worker.onmessage = function(res) {
 		document.getElementById("DetailAltitude").textContent = inp.altitude + " km";
 	}
 	else if (inp.type == 'OrbitResult' && inp.id == TrackingId) {
-		OrbitalBuffer = inp.buffer;
-		const PosArray = new Float64Array(OrbitalBuffer);
+		const PosArray = new Float64Array(inp.buffer);
 		const PosCart = [];
 		for (let i = 0; i < PosArray.length; i += 3) {
 			const cart = Cartesian3.fromRadians(
@@ -299,7 +288,6 @@ Worker.onmessage = function(res) {
 		}
 		OrbitLine.positions = PosCart;
 		OrbitLine.show = true;
-		OrbitBusy = false;
 	}
 }
 
@@ -387,13 +375,11 @@ window.SatClicked = async function (SatId) {
 	const time = JulianDate.toDate(viewer.clock.currentTime).getTime();
 	Worker.postMessage({
 		type: 'CalcOrbit',
-		buffer: OrbitalBuffer,
 		id: TrackingId,
 		time: time,
 		period: Detail.period,
 		samples: OrbitalSamples
-	}, [OrbitalBuffer]);
-	OrbitalBuffer = null;
+	});
 
 	Worker.postMessage({
 		type: 'CalcDetails',
