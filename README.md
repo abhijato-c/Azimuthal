@@ -11,6 +11,17 @@ Azimuthal is a satelltie tracking website thet displays all satellites currently
 
 ---
 
+## Features
+
+1. **Displays satellites:** Shows all currently active satellites as a blue dot above the earth.
+2. **Real-time tracking:** If the CesiumJS timeline is on, all satellites move in real time, reflecting their position.
+3. **Orbital trajectories:** Selecting a satellite will display its orbital trajectory as a red line.
+4. **Filtering:** Satellites shown can be filtered in the left sidebar by name, launch date, launch country/organization and site.
+5. **Sidebar listing:** All shown satellites are listed in the left sidebar, with an image, name and details.
+6. **Satellite details:** The right sidebar shows all satellite details, including position, altitude and speed.
+
+---
+
 ## Technical
 
 1. **CesiumJS:** Main library used for rendering the globe and satellites. All graphics in the center viewport are rendered by CesiumJS, including the globe, orbital lines, satellite dots etc.
