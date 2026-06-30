@@ -117,7 +117,6 @@ html, body {
     width: 0;
     height: 100%;
     overflow-x: hidden;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1);

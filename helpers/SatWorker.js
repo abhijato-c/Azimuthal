@@ -1,4 +1,4 @@
-import { twoline2satrec, gstime, eciToGeodetic, propagate, geodeticToEcf } from 'satellite.js';
+import { twoline2satrec, gstime, eciToGeodetic, propagate, eciToEcf } from 'satellite.js';
 
 let SatrecMap = new Map();
 
@@ -11,7 +11,6 @@ self.onmessage = function (req) {
         const G0 = gstime(T0);
         const G1 = gstime(T1);
         const buffer = inp.buffer;
-        const SelId = inp.Selected;
 
         const Positions = new Float64Array(buffer);
         let offset = 0;
@@ -21,10 +20,8 @@ self.onmessage = function (req) {
             const PV1 = propagate(SatRec, T1);
             if (!PV0 || !PV1 || !PV0.position || !PV1.position) continue;
 
-            const Geo0 = eciToGeodetic(PV0.position, G0);
-            const Geo1 = eciToGeodetic(PV1.position, G1);
-            const ecef0 = geodeticToEcf(Geo0);
-            const ecef1 = geodeticToEcf(Geo1);
+            const ecef0 = eciToEcf(PV0.position, G0);
+            const ecef1 = eciToEcf(PV1.position, G1);
 
             Positions[offset] = id;
             Positions[offset + 1] = ecef0.x * 1000;
@@ -109,7 +106,8 @@ self.onmessage = function (req) {
         self.postMessage({
             type: 'OrbitResult',
             buffer: Positions.buffer,
-            id: id
+            id: id,
+            offset: ArrOffset
         }, [Positions.buffer]);
     }
     else if (inp.type == 'Init') {

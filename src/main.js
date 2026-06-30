@@ -35,6 +35,7 @@ const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 const Points = viewer.scene.primitives.add(new PointPrimitiveCollection());
 const PointsMap = new Map();
 const DetailMap = new Map();
+const ScalingScalar = new NearFarScalar(1.0e5, 1.0, 2.0e7, 0.2);
 const Worker = new SatWorker();
 const TrackingEntity = viewer.entities.add({
 	id: "Tracker",
@@ -134,7 +135,7 @@ async function Init() {
 			position: Cartesian3.ZERO,
 			color: Color.fromCssColorString('#00a8ff').withAlpha(0.8),
 			pixelSize: 12,
-			scaleByDistance: new NearFarScalar(1.0e5, 1.0, 2.0e7, 0.2),
+			scaleByDistance: ScalingScalar,
 			id: sat.norad_id
 		});
 		PointsMap.set(sat.norad_id, Point);
@@ -278,7 +279,7 @@ Worker.onmessage = function(res) {
 	else if (inp.type == 'OrbitResult' && inp.id == TrackingId) {
 		const PosArray = new Float64Array(inp.buffer);
 		const PosCart = [];
-		for (let i = 0; i < PosArray.length; i += 3) {
+		for (let i = 0; i < inp.offset; i += 3) {
 			const cart = Cartesian3.fromRadians(
 				PosArray[i],
 				PosArray[i + 1], 
