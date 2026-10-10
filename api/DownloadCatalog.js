@@ -11,7 +11,7 @@ const ChunkUrl = 'https://www.space-track.org/basicspacedata/query/class/gp/epoc
 export default async function handler(req, res) {
     // Ensure the request is from cron
     const auth = req.headers['authorization'];
-    if (!auth || auth != 'Bearer ' + process.env.CronSecret) return res.status(401).send('Unauthorized');
+    if (!auth || auth !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).send('Unauthorized');
 
     try {
         // Fetch cookie
