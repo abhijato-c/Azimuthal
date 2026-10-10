@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://azimuthal.vercel.app/sitemap.xml
