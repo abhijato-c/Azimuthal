@@ -3,6 +3,8 @@
 ![Banner](https://github.com/abhijato-c/Azimuthal/blob/main/ScreenshotBanner.png)
 > A satellite tracking website with details about all active satellites.
 
+Try it out at [azimuthal.vercel.app](https://azimuthal.vercel.app)
+
 ---
 
 ## Description
