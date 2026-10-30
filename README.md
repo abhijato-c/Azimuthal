@@ -1,6 +1,6 @@
 # Azimuthal Satellite Tracker
 
-![Banner](https://github.com/abhijato-c/Azimuthal/blob/main/ScreenshotBanner.png)
+![Banner](https://github.com/abhijato-c/Azimuthal/blob/main/public/Banner.png)
 > A satellite tracking website with details about all active satellites.
 
 Try it out at [azimuthal.app](https://azimuthal.app)
