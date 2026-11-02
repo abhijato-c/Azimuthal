@@ -1,9 +1,9 @@
 import { 
 	Ion, Viewer, Cartesian3, Color, JulianDate, ClockRange, PointPrimitiveCollection, ScreenSpaceEventHandler, 
-	ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, PolylineCollection, Material, UrlTemplateImageryProvider, 
-	ImageryLayer, knockout 
+	ScreenSpaceEventType, NearFarScalar, CallbackProperty, BoundingSphere, PolylineCollection, Material, 
+	UrlTemplateImageryProvider, ImageryLayer, knockout 
 } from 'cesium';
-import { twoline2satrec, gstime, eciToGeodetic, propagate } from "satellite.js";
+import { twoline2satrec } from "satellite.js";
 import { inject } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import SatWorker from "/helpers/SatWorker.js?worker";
