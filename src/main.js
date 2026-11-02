@@ -577,7 +577,7 @@ window.ToggleMultiselect = function(ID){
 }
 
 window.PageTurn = function(Next) {
-	if (Next && PageIndex < Math.trunc(ActiveIds.length / PageLength))
+	if (Next && PageIndex < Math.ceil(ActiveIds.length / PageLength) - 1)
 		PageIndex += 1;
 	else if (!Next && PageIndex > 0)
 		PageIndex -=1;
