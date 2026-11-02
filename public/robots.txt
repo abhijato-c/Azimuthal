@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.azimuthal.app/sitemap.xml
+Sitemap: https://azimuthal.app/sitemap.xml
