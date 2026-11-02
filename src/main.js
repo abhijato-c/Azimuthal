@@ -285,7 +285,7 @@ function RenderPage(){
 function GetSatImage(Name) {
 	Name = Name.toUpperCase();
 	const match = ImageNames.find(exp => Name.includes(exp));
-	return match ? `/Satellites/${match}.png` : '/Satellites/GENERIC.png';
+	return match ? `/Satellites/${match}.webp` : '/Satellites/GENERIC.webp';
 }
 
 Worker.onmessage = function(res) {
